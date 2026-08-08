@@ -23,6 +23,12 @@ from rich.panel import Panel
 STREAMLINK = "streamlink"
 FLAGS = ["best", "--twitch-low-latency", "--hls-live-edge", "1"]
 
+# Behaviour toggles (future: settings menu / config file).
+HIDE_STREAM_CONSOLE = False    # run streamlink with no console window of its own
+KILL_STREAMS_ON_EXIT = False   # terminate launched streams when the client exits
+
+_children = []                 # Popen handles of launched streams
+
 # Anonymous Twitch web GraphQL (no OAuth).
 GQL_URL = "https://gql.twitch.tv/gql"
 GQL_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
@@ -538,12 +544,29 @@ def render_cat(st, opened, followed):
 
 
 def launch(channel):
-    # Detached console per stream so the menu keeps running and multiple streams
-    # can be open at once. (Roadmap: run hidden, kill on exit.)
-    subprocess.Popen(
-        [STREAMLINK, f"twitch.tv/{channel}", *FLAGS],
-        creationflags=subprocess.CREATE_NEW_CONSOLE,
-    )
+    # Start streamlink detached so the menu keeps running and multiple streams
+    # can be open at once. Tracked so KILL_STREAMS_ON_EXIT can clean up.
+    cmd = [STREAMLINK, f"twitch.tv/{channel}", *FLAGS]
+    kwargs = {}
+    if sys.platform == "win32":
+        kwargs["creationflags"] = (
+            subprocess.CREATE_NO_WINDOW if HIDE_STREAM_CONSOLE else subprocess.CREATE_NEW_CONSOLE
+        )
+    else:
+        kwargs["start_new_session"] = True   # detach from our controlling terminal
+        if HIDE_STREAM_CONSOLE:
+            kwargs["stdout"] = kwargs["stderr"] = subprocess.DEVNULL
+    _children.append(subprocess.Popen(cmd, **kwargs))
+
+
+def kill_streams():
+    # Best-effort terminate of launched streams (used only when the toggle is on).
+    for p in _children:
+        if p.poll() is None:
+            try:
+                p.terminate()
+            except Exception:
+                pass
 
 
 def sort_channels(channels, status):
@@ -865,6 +888,9 @@ def main():
                 st["stop"] = True
                 typed.set()
                 break
+
+    if KILL_STREAMS_ON_EXIT:
+        kill_streams()
 
 
 if __name__ == "__main__":
