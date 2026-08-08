@@ -1,4 +1,9 @@
-"""Twitch public web GraphQL client (anonymous web Client-Id, no OAuth)."""
+"""Twitch public web GraphQL client (anonymous web Client-Id, no OAuth).
+
+The anonymous client-id serves single pages fine but cursor pagination (`after`)
+fails an integrity check, so lists load one large page (~100) rather than
+lazy-loading more on scroll. searchFor is capped at ~10 results by Twitch.
+"""
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -128,7 +133,7 @@ def twitch_search(query, limit=15):
     return out
 
 
-def top_games(limit=20):
+def top_games(limit=100):
     # Most-watched categories right now (shown when the category box is empty).
     try:
         edges = _gql(TOP_GAMES_QUERY, {"n": limit})["data"]["games"]["edges"]
@@ -162,7 +167,7 @@ def search_games(query, limit=15):
     return out
 
 
-def game_streams(name, limit=40):
+def game_streams(name, limit=100):
     # Top live channels in a category, ordered by viewers (Twitch default).
     try:
         edges = _gql(GAME_STREAMS_QUERY, {"name": name, "n": limit})["data"]["game"]["streams"]["edges"]
