@@ -11,6 +11,7 @@ cmd = [
     sys.executable, "-m", "PyInstaller",
     "--onefile", "--console", "--name", "twitch",
     "--icon", ICON,
+    "--paths", os.path.join(ROOT, "src"),
     "--distpath", os.path.join(ROOT, "dist"),
     "--workpath", os.path.join(ROOT, "build_tmp"),
     "--specpath", os.path.join(ROOT, "build_tmp"),

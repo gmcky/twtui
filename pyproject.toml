@@ -20,4 +20,5 @@ twtui = "twtui.app:main"
 Homepage = "https://github.com/gmcky/twtui"
 
 [tool.setuptools]
+package-dir = { "" = "src" }
 packages = ["twtui"]

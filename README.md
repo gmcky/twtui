@@ -57,11 +57,11 @@ pip install -e .
 twtui
 ```
 
-Or run it without installing:
+Or run it straight from a clone:
 
 ```bash
 pip install rich requests
-python watch.py        # or: python -m twtui
+python watch.py
 ```
 
 ## Usage
