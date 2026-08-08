@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Arrow-key TUI to check which followed Twitch channels are live and launch streamlink."""
 import glob
+import json
 import msvcrt
 import os
 import re
@@ -23,9 +24,16 @@ from rich.panel import Panel
 STREAMLINK = "streamlink"
 FLAGS = ["best", "--twitch-low-latency", "--hls-live-edge", "1"]
 
-# Behaviour toggles (future: settings menu / config file).
-HIDE_STREAM_CONSOLE = False    # run streamlink with no console window of its own
-KILL_STREAMS_ON_EXIT = False   # terminate launched streams when the client exits
+# Runtime settings, editable in the settings view and persisted to config.json.
+SETTINGS = {
+    "hide_stream_console": False,   # run streamlink with no console window
+    "kill_streams_on_exit": False,  # terminate launched streams when client exits
+}
+# (key, label, help) in display order.
+SETTINGS_META = [
+    ("hide_stream_console", "Hide streamlink console", "run streams without a console window"),
+    ("kill_streams_on_exit", "Kill streams on exit", "close all open streams when you quit"),
+]
 
 _children = []                 # Popen handles of launched streams
 
@@ -60,12 +68,12 @@ BAT_DIR = getattr(sys, "_MEIPASS", APP_DIR)
 
 console = Console()
 
-_HOTKEYS = ("q", "r", "f", "/")
+_HOTKEYS = ("q", "r", "f", "/", "s")
 
-# Cyrillic keys at the QWERTY q/r/f positions -> the latin hotkey. Cross-platform
+# Cyrillic keys at the QWERTY positions -> the latin hotkey. Cross-platform
 # (pure Python), since you can't type a latin letter on a Cyrillic layout. Latin
 # layouts (EN/DE/AZERTY) already match by character below.
-_FOLD = {"й": "q", "к": "r", "а": "f"}
+_FOLD = {"й": "q", "к": "r", "а": "f", "ы": "s"}
 
 
 def _hotkey(ch):
@@ -94,6 +102,26 @@ def _config_dir():
 CHANNELS_FILE = os.environ.get("TWITCH_TUI_CHANNELS") or os.path.join(_config_dir(), "channels.txt")
 
 CHANNELS_HEADER = "# One Twitch channel per line. Blank lines and #comments ignored.\n"
+
+CONFIG_FILE = os.path.join(_config_dir(), "config.json")
+
+
+def load_config():
+    try:
+        data = json.load(open(CONFIG_FILE, encoding="utf-8"))
+    except Exception:
+        return
+    for k in SETTINGS:
+        if isinstance(data.get(k), bool):
+            SETTINGS[k] = data[k]
+
+
+def save_config():
+    try:
+        with open(CONFIG_FILE, "w", encoding="utf-8") as f:
+            json.dump(SETTINGS, f, indent=2)
+    except Exception:
+        pass
 
 
 def _read_channels(path):
@@ -242,7 +270,7 @@ def render(channels, status, selected, checking, opened):
     body = Panel(
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
-        subtitle="[dim]↑↓ move · enter watch · f unfollow · r refresh · tab search · ctrl+g games · q quit[/]",
+        subtitle="[dim]↑↓ move · enter watch · f unfollow · r refresh · tab search · ctrl+g games · s settings · q quit[/]",
         border_style="magenta",
         padding=(1, 2),
     )
@@ -543,18 +571,39 @@ def render_cat(st, opened, followed):
     return Group(search_panel, body)
 
 
+def render_settings(st):
+    table = Table(show_header=False, box=None, padding=(0, 1))
+    table.add_column("", width=2)
+    table.add_column("", width=5)
+    table.add_column("Setting")
+    for i, (key, label, help_) in enumerate(SETTINGS_META):
+        is_sel = i == st["set_sel"]
+        cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
+        on = SETTINGS[key]
+        toggle = Text("[on]" if on else "[off]", style="bold green" if on else "dim")
+        name = Text(f" {label} ", style="bold white on grey19" if is_sel else "white")
+        name.append(f"  {help_}", style="dim")
+        table.add_row(cursor, toggle, name)
+    return Panel(
+        table,
+        title="[bold magenta]settings[/]",
+        subtitle="[dim]↑↓ move · enter/space toggle · esc back · ctrl+q quit[/]",
+        border_style="magenta",
+        padding=(1, 2),
+    )
+
+
 def launch(channel):
     # Start streamlink detached so the menu keeps running and multiple streams
     # can be open at once. Tracked so KILL_STREAMS_ON_EXIT can clean up.
     cmd = [STREAMLINK, f"twitch.tv/{channel}", *FLAGS]
+    hide = SETTINGS["hide_stream_console"]
     kwargs = {}
     if sys.platform == "win32":
-        kwargs["creationflags"] = (
-            subprocess.CREATE_NO_WINDOW if HIDE_STREAM_CONSOLE else subprocess.CREATE_NEW_CONSOLE
-        )
+        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW if hide else subprocess.CREATE_NEW_CONSOLE
     else:
         kwargs["start_new_session"] = True   # detach from our controlling terminal
-        if HIDE_STREAM_CONSOLE:
+        if hide:
             kwargs["stdout"] = kwargs["stderr"] = subprocess.DEVNULL
     _children.append(subprocess.Popen(cmd, **kwargs))
 
@@ -574,6 +623,7 @@ def sort_channels(channels, status):
 
 
 def main():
+    load_config()
     channels = load_channels()   # may be empty on a fresh install — that's fine,
                                  # follow channels from the search view (tab / →)
 
@@ -584,8 +634,9 @@ def main():
 
     # Shared state for the search modes + worker thread.
     st = {
-        "mode": "list",      # "list" | "search" | "cats" | "cat"
+        "mode": "list",      # "list" | "search" | "cats" | "cat" | "settings"
         "query": "",         # channel search
+        "set_sel": 0,        # settings view cursor
         "results": [],
         "sel": 0,
         "gen": 0,            # bumped on every keystroke; stale replies are dropped
@@ -610,6 +661,9 @@ def main():
 
         def paint_list():
             live.update(render(channels, status, selected, False, opened), refresh=True)
+
+        def paint_settings():
+            live.update(render_settings(st), refresh=True)
 
         def paint_search():
             live.update(render_search(st, opened, followed), refresh=True)
@@ -744,6 +798,9 @@ def main():
                             if st["cat_results"]:
                                 st["cat_sel"] = (st["cat_sel"] + delta) % len(st["cat_results"])
                         paint_cats()
+                    elif mode == "settings":
+                        st["set_sel"] = (st["set_sel"] + delta) % len(SETTINGS_META)
+                        paint_settings()
                     else:  # cat
                         n = len(_filter_streams(st["cat_streams"], st["cat_ch_query"]))
                         if n:
@@ -757,6 +814,18 @@ def main():
                     st["mode"] = "search"
                     paint_search()
                 elif mode == "search":
+                    st["mode"] = "list"
+                    paint_list()
+                continue
+
+            # --- settings view ---
+            if mode == "settings":
+                if ch in ("\r", "\n", " "):               # toggle
+                    key = SETTINGS_META[st["set_sel"]][0]
+                    SETTINGS[key] = not SETTINGS[key]
+                    save_config()
+                    paint_settings()
+                elif ch == "\x1b":                        # esc -> list
                     st["mode"] = "list"
                     paint_list()
                 continue
@@ -874,6 +943,10 @@ def main():
             elif hot == "/":                 # jump straight into search
                 st["mode"] = "search"
                 paint_search()
+            elif hot == "s":                 # settings
+                st["mode"] = "settings"
+                st["set_sel"] = 0
+                paint_settings()
             elif ch == "\x07":               # ctrl+g -> categories
                 open_categories()
             elif hot == "r":
@@ -889,7 +962,7 @@ def main():
                 typed.set()
                 break
 
-    if KILL_STREAMS_ON_EXIT:
+    if SETTINGS["kill_streams_on_exit"]:
         kill_streams()
 
 
