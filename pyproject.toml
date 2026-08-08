@@ -1,0 +1,23 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "twtui"
+version = "0.1.0"
+description = "A terminal UI for watching Twitch."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "gmcky" }]
+keywords = ["twitch", "tui", "terminal", "streamlink", "cli"]
+dependencies = ["rich>=13", "requests>=2"]
+
+[project.scripts]
+twtui = "twtui.app:main"
+
+[project.urls]
+Homepage = "https://github.com/gmcky/twtui"
+
+[tool.setuptools]
+packages = ["twtui"]
