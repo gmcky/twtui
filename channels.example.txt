@@ -1,0 +1,7 @@
+# One Twitch channel per line. Blank lines and #comments ignored.
+# Copy to your config dir or just follow channels in-app (Ctrl+F).
+# Windows: %APPDATA%\twitch-tui\channels.txt
+# Linux:   ~/.config/twitch-tui/channels.txt
+# macOS:   ~/Library/Application Support/twitch-tui/channels.txt
+eido
+eslcs
