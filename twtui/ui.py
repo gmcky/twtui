@@ -23,14 +23,14 @@ def loading_panel(msg="checking channels"):
 
 
 def render(channels, status, selected, checking, opened):
-    table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim")
-    table.add_column("", width=2)
-    table.add_column("", width=2)
-    table.add_column("Status", width=6)
-    table.add_column("Channel")
-    table.add_column("Viewers", justify="right", width=9)
-    table.add_column("Game")
-    table.add_column("", width=8)
+    table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("Status", width=6, no_wrap=True)
+    table.add_column("Channel", ratio=2, no_wrap=True, overflow="ellipsis")
+    table.add_column("Viewers", justify="right", width=9, no_wrap=True)
+    table.add_column("Game", ratio=1, no_wrap=True, overflow="ellipsis")
+    table.add_column("", width=8, no_wrap=True)
 
     vis, rsel, start, end = _window(channels, selected, _max_rows(6))
     for j, ch in enumerate(vis):
@@ -114,13 +114,13 @@ def _tabs(active):
 
 def _channel_table(results, sel, opened, followed):
     # Shared by the search view and the in-category view.
-    table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim")
-    table.add_column("", width=2)
-    table.add_column("", width=2)
-    table.add_column("Channel")
-    table.add_column("Viewers", justify="right", width=9)
-    table.add_column("Game")
-    table.add_column("", width=10)
+    table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("Channel", ratio=2, no_wrap=True, overflow="ellipsis")
+    table.add_column("Viewers", justify="right", width=9, no_wrap=True)
+    table.add_column("Game", ratio=1, no_wrap=True, overflow="ellipsis")
+    table.add_column("", width=10, no_wrap=True)
     for i, res in enumerate(results):
         is_sel = i == sel
         live_ = res["live"]
@@ -198,10 +198,10 @@ def render_cats(st):
         inner = Align.center(Text("no categories", style="dim"), vertical="middle")
     else:
         vis, rsel, start, end = _window(results, st["cat_sel"], _max_rows(9))
-        table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim")
-        table.add_column("", width=2)
-        table.add_column("Category")
-        table.add_column("Viewers", justify="right", width=11)
+        table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
+        table.add_column("", width=2, no_wrap=True)
+        table.add_column("Category", ratio=1, no_wrap=True, overflow="ellipsis")
+        table.add_column("Viewers", justify="right", width=12, no_wrap=True)
         for i, g in enumerate(vis):
             is_sel = i == rsel
             cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
