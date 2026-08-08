@@ -2,7 +2,6 @@
 """Arrow-key TUI to check which followed Twitch channels are live and launch streamlink."""
 import glob
 import json
-import msvcrt
 import os
 import re
 import subprocess
@@ -83,6 +82,83 @@ def _hotkey(ch):
     if low in _HOTKEYS:
         return low
     return _FOLD.get(low)
+
+
+# --- cross-platform key input ---------------------------------------------
+# read_key() returns a normalised token: one of the SPECIAL names below, a single
+# printable character, or None to ignore. term_setup()/term_restore() put the
+# POSIX terminal into cbreak mode around the loop (no-ops on Windows).
+SPECIAL = {"UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESC",
+           "BACKSPACE", "TAB", "CTRL_F", "CTRL_G", "CTRL_Q"}
+
+_CTRL = {
+    "\r": "ENTER", "\n": "ENTER", "\x1b": "ESC", "\x7f": "BACKSPACE",
+    "\x08": "BACKSPACE", "\t": "TAB", "\x06": "CTRL_F", "\x07": "CTRL_G",
+    "\x11": "CTRL_Q",
+}
+
+
+def _norm(ch):
+    if ch in _CTRL:
+        return _CTRL[ch]
+    return ch if ch.isprintable() else None
+
+
+if sys.platform == "win32":
+    import msvcrt
+
+    _WIN_ARROW = {"H": "UP", "P": "DOWN", "K": "LEFT", "M": "RIGHT"}
+
+    def term_setup():
+        return None
+
+    def term_restore(_state):
+        pass
+
+    def read_key():
+        ch = msvcrt.getwch()
+        if ch in ("\x00", "\xe0"):
+            return _WIN_ARROW.get(msvcrt.getwch())
+        return _norm(ch)
+else:
+    import select
+    import termios
+    import tty
+
+    _POSIX_SEQ = {
+        "[A": "UP", "[B": "DOWN", "[C": "RIGHT", "[D": "LEFT",
+        "OA": "UP", "OB": "DOWN", "OC": "RIGHT", "OD": "LEFT",
+    }
+
+    def term_setup():
+        fd = sys.stdin.fileno()
+        state = termios.tcgetattr(fd)
+        tty.setcbreak(fd)
+        return state
+
+    def term_restore(state):
+        if state is not None:
+            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, state)
+
+    def read_key():
+        fd = sys.stdin.fileno()
+        b = os.read(fd, 1)
+        if b == b"\x1b":
+            # ESC alone vs an escape sequence: brief peek for the continuation.
+            r, _, _ = select.select([fd], [], [], 0.03)
+            if not r:
+                return "ESC"
+            seq = os.read(fd, 2).decode("latin-1", "ignore")
+            return _POSIX_SEQ.get(seq)
+        o = b[0]
+        if o < 0x80:
+            return _norm(chr(o))
+        # utf-8 lead byte: read the continuation bytes and decode.
+        n = 2 if o < 0xE0 else 3 if o < 0xF0 else 4
+        try:
+            return _norm((b + os.read(fd, n - 1)).decode("utf-8"))
+        except Exception:
+            return None
 
 
 def _config_dir():
@@ -762,28 +838,22 @@ def main():
             selected = min(selected, max(len(channels) - 1, 0))
             save_channels(channels)
 
-        while True:
-            # getwch: unicode char, works with any codepage / keyboard language.
-            ch = msvcrt.getwch()
-            mode = st["mode"]
-
-            if ch == "\x11":                 # ctrl+q quits from any mode
-                st["stop"] = True
-                typed.set()
-                break
-
-            # --- arrow keys (all modes) ---
-            if ch in ("\x00", "\xe0"):
-                code = msvcrt.getwch()
-                if code in ("K", "M"):       # left/right -> switch streamers/categories
-                    if mode == "search":
-                        open_categories()
-                    elif mode == "cats":
-                        st["mode"] = "search"
-                        paint_search()
+        term_state = term_setup()
+        try:
+            while True:
+                tok = read_key()
+                if tok is None:
                     continue
-                delta = -1 if code == "H" else 1 if code == "P" else 0
-                if delta:
+                mode = st["mode"]
+                char = tok if tok not in SPECIAL else None
+
+                if tok == "CTRL_Q":
+                    st["stop"] = True
+                    typed.set()
+                    break
+
+                if tok in ("UP", "DOWN"):
+                    delta = -1 if tok == "UP" else 1
                     if mode == "list":
                         if channels:
                             selected = (selected + delta) % len(channels)
@@ -806,161 +876,171 @@ def main():
                         if n:
                             st["cat_ch_sel"] = (st["cat_ch_sel"] + delta) % n
                         paint_cat()
-                continue
+                    continue
 
-            # --- tab toggles list <-> search only ---
-            if ch == "\t":
-                if mode == "list":
-                    st["mode"] = "search"
-                    paint_search()
-                elif mode == "search":
-                    st["mode"] = "list"
-                    paint_list()
-                continue
+                if tok in ("LEFT", "RIGHT"):     # switch streamers/categories
+                    if mode == "search":
+                        open_categories()
+                    elif mode == "cats":
+                        st["mode"] = "search"
+                        paint_search()
+                    continue
 
-            # --- settings view ---
-            if mode == "settings":
-                if ch in ("\r", "\n", " "):               # toggle
-                    key = SETTINGS_META[st["set_sel"]][0]
-                    SETTINGS[key] = not SETTINGS[key]
-                    save_config()
-                    paint_settings()
-                elif ch == "\x1b":                        # esc -> list
-                    st["mode"] = "list"
-                    paint_list()
-                continue
+                if tok == "TAB":                 # toggle list <-> search
+                    if mode == "list":
+                        st["mode"] = "search"
+                        paint_search()
+                    elif mode == "search":
+                        st["mode"] = "list"
+                        paint_list()
+                    continue
 
-            # --- category search view ---
-            if mode == "cats":
-                if ch in ("\r", "\n"):
-                    with lock:
-                        g = st["cat_results"][st["cat_sel"]] if st["cat_results"] else None
-                    if g:
-                        st["game_name"], st["game_display"] = g["name"], g["display"]
-                        st["cat_ch_query"], st["cat_ch_sel"] = "", 0
-                        st["cat_streams"], st["cat_searching"] = [], True
-                        st["mode"] = "cat"
-                        paint_cat()                       # loading spinner
-                        streams = game_streams(g["name"])
+                if mode == "settings":
+                    if tok == "ENTER" or char == " ":
+                        key = SETTINGS_META[st["set_sel"]][0]
+                        SETTINGS[key] = not SETTINGS[key]
+                        save_config()
+                        paint_settings()
+                    elif tok == "ESC":
+                        st["mode"] = "list"
+                        paint_list()
+                    continue
+
+                if mode == "cats":
+                    if tok == "ENTER":
                         with lock:
-                            st["cat_streams"], st["cat_searching"], st["cat_ch_sel"] = streams, False, 0
-                        paint_cat()
-                elif ch == "\x1b":                        # esc -> channel search
-                    st["mode"] = "search"
-                    paint_search()
-                elif ch == "\x08":                        # backspace
-                    with lock:
-                        st["cat_query"] = st["cat_query"][:-1]
-                        st["gen"] += 1
-                    typed.set()
-                    paint_cats()
-                elif ch.isprintable():
-                    with lock:
-                        st["cat_query"] += ch
-                        st["gen"] += 1
-                    typed.set()
-                    paint_cats()
-                continue
-
-            # --- inside a category (client-side filter of loaded streams) ---
-            if mode == "cat":
-                filtered = _filter_streams(st["cat_streams"], st["cat_ch_query"])
-                if ch in ("\r", "\n"):
-                    res = filtered[st["cat_ch_sel"]] if filtered else None
-                    if res:
-                        launch(res["login"])
-                        opened.add(res["login"])
-                        paint_cat()
-                elif ch == "\x06":                        # ctrl+f follow/unfollow
-                    res = filtered[st["cat_ch_sel"]] if filtered else None
-                    if res:
-                        follow_toggle(res)
-                        paint_cat()
-                elif ch == "\x1b":                        # esc -> categories
-                    st["mode"] = "cats"
-                    paint_cats()
-                elif ch == "\x08":                        # backspace
-                    st["cat_ch_query"] = st["cat_ch_query"][:-1]
-                    st["cat_ch_sel"] = 0
-                    paint_cat()
-                elif ch.isprintable():
-                    st["cat_ch_query"] += ch
-                    st["cat_ch_sel"] = 0
-                    paint_cat()
-                continue
-
-            # --- channel search view ---
-            if mode == "search":
-                if ch in ("\r", "\n"):
-                    with lock:
-                        res = st["results"][st["sel"]] if st["results"] else None
-                    if res:
-                        launch(res["login"])
-                        opened.add(res["login"])
+                            g = st["cat_results"][st["cat_sel"]] if st["cat_results"] else None
+                        if g:
+                            st["game_name"], st["game_display"] = g["name"], g["display"]
+                            st["cat_ch_query"], st["cat_ch_sel"] = "", 0
+                            st["cat_streams"], st["cat_searching"] = [], True
+                            st["mode"] = "cat"
+                            paint_cat()                   # loading spinner
+                            streams = game_streams(g["name"])
+                            with lock:
+                                st["cat_streams"], st["cat_searching"], st["cat_ch_sel"] = streams, False, 0
+                            paint_cat()
+                    elif tok == "ESC":
+                        st["mode"] = "search"
                         paint_search()
-                elif ch == "\x06":                        # ctrl+f follow/unfollow
-                    with lock:
-                        res = st["results"][st["sel"]] if st["results"] else None
-                    if res:
-                        follow_toggle(res)
+                    elif tok == "BACKSPACE":
+                        with lock:
+                            st["cat_query"] = st["cat_query"][:-1]
+                            st["gen"] += 1
+                        typed.set()
+                        paint_cats()
+                    elif char is not None:
+                        with lock:
+                            st["cat_query"] += char
+                            st["gen"] += 1
+                        typed.set()
+                        paint_cats()
+                    continue
+
+                if mode == "cat":
+                    filtered = _filter_streams(st["cat_streams"], st["cat_ch_query"])
+                    if tok == "ENTER":
+                        res = filtered[st["cat_ch_sel"]] if filtered else None
+                        if res:
+                            launch(res["login"])
+                            opened.add(res["login"])
+                            paint_cat()
+                    elif tok == "CTRL_F":
+                        res = filtered[st["cat_ch_sel"]] if filtered else None
+                        if res:
+                            follow_toggle(res)
+                            paint_cat()
+                    elif tok == "ESC":
+                        st["mode"] = "cats"
+                        paint_cats()
+                    elif tok == "BACKSPACE":
+                        st["cat_ch_query"] = st["cat_ch_query"][:-1]
+                        st["cat_ch_sel"] = 0
+                        paint_cat()
+                    elif char is not None:
+                        st["cat_ch_query"] += char
+                        st["cat_ch_sel"] = 0
+                        paint_cat()
+                    continue
+
+                if mode == "search":
+                    if tok == "ENTER":
+                        with lock:
+                            res = st["results"][st["sel"]] if st["results"] else None
+                        if res:
+                            launch(res["login"])
+                            opened.add(res["login"])
+                            paint_search()
+                    elif tok == "CTRL_F":
+                        with lock:
+                            res = st["results"][st["sel"]] if st["results"] else None
+                        if res:
+                            follow_toggle(res)
+                            paint_search()
+                    elif tok == "CTRL_G":
+                        open_categories()
+                    elif tok == "ESC":
+                        st["mode"] = "list"
+                        paint_list()
+                    elif tok == "BACKSPACE":
+                        with lock:
+                            st["query"] = st["query"][:-1]
+                            st["gen"] += 1
+                        typed.set()
                         paint_search()
-                elif ch == "\x07":                        # ctrl+g -> categories
+                    elif char is not None:
+                        # Any language: Twitch search matches display names too.
+                        with lock:
+                            st["query"] += char
+                            st["gen"] += 1
+                        typed.set()
+                        paint_search()
+                    continue
+
+                # --- list mode (hotkeys matched by physical key, any layout) ---
+                if tok == "ENTER":
+                    if channels:
+                        launch(channels[selected])
+                        opened.add(channels[selected])
+                        paint_list()
+                elif tok == "CTRL_G":
                     open_categories()
-                elif ch == "\x1b":                        # esc -> back to list
-                    st["mode"] = "list"
-                    paint_list()
-                elif ch == "\x08":                        # backspace
-                    with lock:
-                        st["query"] = st["query"][:-1]
-                        st["gen"] += 1
+                elif tok == "ESC":
+                    st["stop"] = True
                     typed.set()
-                    paint_search()
-                elif ch.isprintable():
-                    # Any language: Twitch search matches display names too.
-                    with lock:
-                        st["query"] += ch
-                        st["gen"] += 1
-                    typed.set()
-                    paint_search()
-                continue
-
-            # --- list mode (hotkeys matched by physical key, any layout) ---
-            hot = _hotkey(ch)
-            if ch in ("\r", "\n"):
-                if channels:
-                    launch(channels[selected])
-                    opened.add(channels[selected])
-                    paint_list()
-            elif hot == "f":                 # unfollow selected channel
-                if channels:
-                    removed = channels.pop(selected)
-                    followed.discard(removed.lower())
-                    status.pop(removed, None)
-                    save_channels(channels)
-                    if selected >= len(channels):
-                        selected = max(len(channels) - 1, 0)
-                    paint_list()
-            elif hot == "/":                 # jump straight into search
-                st["mode"] = "search"
-                paint_search()
-            elif hot == "s":                 # settings
-                st["mode"] = "settings"
-                st["set_sel"] = 0
-                paint_settings()
-            elif ch == "\x07":               # ctrl+g -> categories
-                open_categories()
-            elif hot == "r":
-                live.auto_refresh = True
-                live.update(loading_panel(), refresh=True)
-                status = get_status(channels)
-                sort_channels(channels, status)
-                selected = 0
-                live.auto_refresh = False
-                paint_list()
-            elif hot == "q" or ch == "\x1b":
-                st["stop"] = True
-                typed.set()
-                break
+                    break
+                else:
+                    hot = _hotkey(char) if char else None
+                    if hot == "f":               # unfollow selected channel
+                        if channels:
+                            removed = channels.pop(selected)
+                            followed.discard(removed.lower())
+                            status.pop(removed, None)
+                            save_channels(channels)
+                            if selected >= len(channels):
+                                selected = max(len(channels) - 1, 0)
+                            paint_list()
+                    elif hot == "/":             # jump straight into search
+                        st["mode"] = "search"
+                        paint_search()
+                    elif hot == "s":             # settings
+                        st["mode"] = "settings"
+                        st["set_sel"] = 0
+                        paint_settings()
+                    elif hot == "r":
+                        live.auto_refresh = True
+                        live.update(loading_panel(), refresh=True)
+                        status = get_status(channels)
+                        sort_channels(channels, status)
+                        selected = 0
+                        live.auto_refresh = False
+                        paint_list()
+                    elif hot == "q":
+                        st["stop"] = True
+                        typed.set()
+                        break
+        finally:
+            term_restore(term_state)
 
     if SETTINGS["kill_streams_on_exit"]:
         kill_streams()
