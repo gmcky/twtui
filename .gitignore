@@ -1,0 +1,20 @@
+# personal notes / scratch (never public)
+.personal/
+
+# user data (lives in per-user config dir; example is committed)
+channels.txt
+
+# windows shortcuts (per-machine, absolute paths)
+*.lnk
+
+# python
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# pyinstaller build artifacts
+build/
+build_tmp/
+*.spec
+dist/
