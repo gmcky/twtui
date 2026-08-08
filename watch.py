@@ -8,9 +8,7 @@ import subprocess
 import sys
 import threading
 import time
-from concurrent.futures import ThreadPoolExecutor
 
-import requests
 from rich.align import Align
 from rich.console import Console
 from rich.console import Group
@@ -19,6 +17,11 @@ from rich.spinner import Spinner
 from rich.table import Table
 from rich.text import Text
 from rich.panel import Panel
+
+from twtui.api import (
+    OFFLINE, get_status, twitch_search, top_games, search_games, game_streams,
+)
+from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL
 
 STREAMLINK = "streamlink"
 FLAGS = ["best", "--twitch-low-latency", "--hls-live-edge", "1"]
@@ -36,27 +39,6 @@ SETTINGS_META = [
 
 _children = []                 # Popen handles of launched streams
 
-# Anonymous Twitch web GraphQL (no OAuth).
-GQL_URL = "https://gql.twitch.tv/gql"
-GQL_CLIENT_ID = "kimne78kx3ncx6brgo4mv6wki5h1ko"
-SEARCH_QUERY = """
-query($q: String!) {
-  searchFor(userQuery: $q, platform: "web", options: {}) {
-    channels {
-      edges {
-        item {
-          ... on User {
-            login
-            displayName
-            stream { id viewersCount game { displayName } }
-          }
-        }
-      }
-    }
-  }
-}
-"""
-
 # App dir (frozen exe or source); used only to find a legacy channels.txt / *.bat.
 if getattr(sys, "frozen", False):
     APP_DIR = os.path.dirname(sys.executable)
@@ -66,99 +48,6 @@ else:
 BAT_DIR = getattr(sys, "_MEIPASS", APP_DIR)
 
 console = Console()
-
-_HOTKEYS = ("q", "r", "f", "/", "s")
-
-# Cyrillic keys at the QWERTY positions -> the latin hotkey. Cross-platform
-# (pure Python), since you can't type a latin letter on a Cyrillic layout. Latin
-# layouts (EN/DE/AZERTY) already match by character below.
-_FOLD = {"й": "q", "к": "r", "а": "f", "ы": "s"}
-
-
-def _hotkey(ch):
-    if not ch:
-        return None
-    low = ch.lower()
-    if low in _HOTKEYS:
-        return low
-    return _FOLD.get(low)
-
-
-# --- cross-platform key input ---------------------------------------------
-# read_key() returns a normalised token: one of the SPECIAL names below, a single
-# printable character, or None to ignore. term_setup()/term_restore() put the
-# POSIX terminal into cbreak mode around the loop (no-ops on Windows).
-SPECIAL = {"UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESC",
-           "BACKSPACE", "TAB", "CTRL_F", "CTRL_G", "CTRL_Q"}
-
-_CTRL = {
-    "\r": "ENTER", "\n": "ENTER", "\x1b": "ESC", "\x7f": "BACKSPACE",
-    "\x08": "BACKSPACE", "\t": "TAB", "\x06": "CTRL_F", "\x07": "CTRL_G",
-    "\x11": "CTRL_Q",
-}
-
-
-def _norm(ch):
-    if ch in _CTRL:
-        return _CTRL[ch]
-    return ch if ch.isprintable() else None
-
-
-if sys.platform == "win32":
-    import msvcrt
-
-    _WIN_ARROW = {"H": "UP", "P": "DOWN", "K": "LEFT", "M": "RIGHT"}
-
-    def term_setup():
-        return None
-
-    def term_restore(_state):
-        pass
-
-    def read_key():
-        ch = msvcrt.getwch()
-        if ch in ("\x00", "\xe0"):
-            return _WIN_ARROW.get(msvcrt.getwch())
-        return _norm(ch)
-else:
-    import select
-    import termios
-    import tty
-
-    _POSIX_SEQ = {
-        "[A": "UP", "[B": "DOWN", "[C": "RIGHT", "[D": "LEFT",
-        "OA": "UP", "OB": "DOWN", "OC": "RIGHT", "OD": "LEFT",
-    }
-
-    def term_setup():
-        fd = sys.stdin.fileno()
-        state = termios.tcgetattr(fd)
-        tty.setcbreak(fd)
-        return state
-
-    def term_restore(state):
-        if state is not None:
-            termios.tcsetattr(sys.stdin.fileno(), termios.TCSADRAIN, state)
-
-    def read_key():
-        fd = sys.stdin.fileno()
-        b = os.read(fd, 1)
-        if b == b"\x1b":
-            # ESC alone vs an escape sequence: brief peek for the continuation.
-            r, _, _ = select.select([fd], [], [], 0.03)
-            if not r:
-                return "ESC"
-            seq = os.read(fd, 2).decode("latin-1", "ignore")
-            return _POSIX_SEQ.get(seq)
-        o = b[0]
-        if o < 0x80:
-            return _norm(chr(o))
-        # utf-8 lead byte: read the continuation bytes and decode.
-        n = 2 if o < 0xE0 else 3 if o < 0xF0 else 4
-        try:
-            return _norm((b + os.read(fd, n - 1)).decode("utf-8"))
-        except Exception:
-            return None
 
 
 def _config_dir():
@@ -238,56 +127,6 @@ def save_channels(channels):
             f.write(c + "\n")
 
 
-USERS_QUERY = """
-query($logins: [String!]) {
-  users(logins: $logins) {
-    login
-    displayName
-    stream { id viewersCount game { displayName } }
-  }
-}
-"""
-
-
-OFFLINE = {"live": False, "viewers": 0, "game": "", "display": ""}
-
-
-def _gql_live(logins):
-    # One request resolves live-status for a batch of logins -> {login_lower: meta}.
-    try:
-        r = requests.post(
-            GQL_URL,
-            headers={"Client-Id": GQL_CLIENT_ID},
-            json={"query": USERS_QUERY, "variables": {"logins": logins}},
-            timeout=10,
-        )
-        users = r.json()["data"]["users"]
-    except Exception:
-        return {}
-    out = {}
-    for u in users:
-        if not u:
-            continue
-        s = u.get("stream")
-        out[u["login"].lower()] = {
-            "live": bool(s),
-            "viewers": (s or {}).get("viewersCount") or 0,
-            "game": ((s or {}).get("game") or {}).get("displayName") or "",
-            "display": u.get("displayName") or u["login"],
-        }
-    return out
-
-
-def get_status(channels):
-    # Chunk under the per-query login cap; run chunks in parallel.
-    chunks = [channels[i:i + 90] for i in range(0, len(channels), 90)]
-    meta = {}
-    with ThreadPoolExecutor(max_workers=max(len(chunks), 1)) as pool:
-        for part in pool.map(_gql_live, chunks):
-            meta.update(part)
-    return {ch: meta.get(ch.lower(), OFFLINE) for ch in channels}
-
-
 def loading_panel(msg="checking channels"):
     spinner = Spinner("dots", text=Text(f" {msg} …", style="cyan"), style="magenta")
     return Panel(
@@ -351,132 +190,6 @@ def render(channels, status, selected, checking, opened):
         padding=(1, 2),
     )
     return body
-
-
-def twitch_search(query, limit=15):
-    # Fuzzy channel search across all of Twitch, live channels first (stable sort
-    # keeps Twitch's relevance order within each group).
-    try:
-        r = requests.post(
-            GQL_URL,
-            headers={"Client-Id": GQL_CLIENT_ID},
-            json={"query": SEARCH_QUERY, "variables": {"q": query}},
-            timeout=10,
-        )
-        edges = r.json()["data"]["searchFor"]["channels"]["edges"]
-    except Exception:
-        return []
-
-    out = []
-    for e in edges[:limit]:
-        it = e.get("item") or {}
-        login = it.get("login")
-        if not login:
-            continue
-        s = it.get("stream")
-        out.append({
-            "login": login,
-            "display": it.get("displayName") or login,
-            "live": bool(s),
-            "viewers": (s or {}).get("viewersCount") or 0,
-            "game": ((s or {}).get("game") or {}).get("displayName") or "",
-        })
-    out.sort(key=lambda x: not x["live"])  # stable: live first, relevance kept
-    return out
-
-
-TOP_GAMES_QUERY = """
-query($n: Int!) {
-  games(first: $n) { edges { node { name displayName viewersCount } } }
-}
-"""
-
-GAMES_SEARCH_QUERY = """
-query($q: String!) {
-  searchFor(userQuery: $q, platform: "web", options: {}) {
-    games { edges { item { ... on Game { name displayName viewersCount } } } }
-  }
-}
-"""
-
-GAME_STREAMS_QUERY = """
-query($name: String!, $n: Int!) {
-  game(name: $name) {
-    displayName
-    streams(first: $n) {
-      edges { node {
-        viewersCount
-        broadcaster { login displayName }
-        game { displayName }
-      } }
-    }
-  }
-}
-"""
-
-
-def _gql(query, variables):
-    return requests.post(
-        GQL_URL, headers={"Client-Id": GQL_CLIENT_ID},
-        json={"query": query, "variables": variables}, timeout=10,
-    ).json()
-
-
-def top_games(limit=20):
-    # Most-watched categories right now (shown when the category box is empty).
-    try:
-        edges = _gql(TOP_GAMES_QUERY, {"n": limit})["data"]["games"]["edges"]
-    except Exception:
-        return []
-    out = []
-    for e in edges:
-        n = e["node"]
-        name = n.get("name") or n.get("displayName")
-        if not name:
-            continue
-        out.append({"name": name, "display": n.get("displayName") or name,
-                    "viewers": n.get("viewersCount") or 0})
-    return out
-
-
-def search_games(query, limit=15):
-    # Fuzzy category search (same relevance behaviour as channel search).
-    try:
-        edges = _gql(GAMES_SEARCH_QUERY, {"q": query})["data"]["searchFor"]["games"]["edges"]
-    except Exception:
-        return []
-    out = []
-    for e in edges[:limit]:
-        it = e.get("item") or {}
-        name = it.get("name")
-        if not name:
-            continue
-        out.append({"name": name, "display": it.get("displayName") or name,
-                    "viewers": it.get("viewersCount") or 0})
-    return out
-
-
-def game_streams(name, limit=40):
-    # Top live channels in a category, ordered by viewers (Twitch default).
-    try:
-        edges = _gql(GAME_STREAMS_QUERY, {"name": name, "n": limit})["data"]["game"]["streams"]["edges"]
-    except Exception:
-        return []
-    out = []
-    for e in edges:
-        n = e["node"]
-        b = n.get("broadcaster") or {}
-        login = b.get("login")
-        if not login:
-            continue
-        out.append({
-            "login": login,
-            "display": b.get("displayName") or login,
-            "live": True,
-            "viewers": n.get("viewersCount") or 0,
-            "game": (n.get("game") or {}).get("displayName") or "",
-        })
-    return out
 
 
 def _filter_streams(streams, q):
