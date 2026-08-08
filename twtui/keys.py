@@ -7,43 +7,26 @@ POSIX terminal into cbreak mode around the loop (no-ops on Windows).
 import os
 import sys
 
-_HOTKEYS = ("q", "r", "f", "/", "s")
-
-# Cyrillic keys at the QWERTY positions -> the latin hotkey. Cross-platform
-# (pure Python), since you can't type a latin letter on a Cyrillic layout. Latin
-# layouts (EN/DE/AZERTY) already match by character below.
-_FOLD = {"й": "q", "к": "r", "а": "f", "ы": "s"}
+from twtui.keymap import HOTKEYS, FOLD, SPECIAL, CTRL, WIN_ARROW, POSIX_SEQ
 
 
 def _hotkey(ch):
     if not ch:
         return None
     low = ch.lower()
-    if low in _HOTKEYS:
+    if low in HOTKEYS:
         return low
-    return _FOLD.get(low)
-
-
-SPECIAL = {"UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESC",
-           "BACKSPACE", "TAB", "CTRL_F", "CTRL_G", "CTRL_Q"}
-
-_CTRL = {
-    "\r": "ENTER", "\n": "ENTER", "\x1b": "ESC", "\x7f": "BACKSPACE",
-    "\x08": "BACKSPACE", "\t": "TAB", "\x06": "CTRL_F", "\x07": "CTRL_G",
-    "\x11": "CTRL_Q",
-}
+    return FOLD.get(low)
 
 
 def _norm(ch):
-    if ch in _CTRL:
-        return _CTRL[ch]
+    if ch in CTRL:
+        return CTRL[ch]
     return ch if ch.isprintable() else None
 
 
 if sys.platform == "win32":
     import msvcrt
-
-    _WIN_ARROW = {"H": "UP", "P": "DOWN", "K": "LEFT", "M": "RIGHT"}
 
     def term_setup():
         return None
@@ -54,17 +37,12 @@ if sys.platform == "win32":
     def read_key():
         ch = msvcrt.getwch()
         if ch in ("\x00", "\xe0"):
-            return _WIN_ARROW.get(msvcrt.getwch())
+            return WIN_ARROW.get(msvcrt.getwch())
         return _norm(ch)
 else:
     import select
     import termios
     import tty
-
-    _POSIX_SEQ = {
-        "[A": "UP", "[B": "DOWN", "[C": "RIGHT", "[D": "LEFT",
-        "OA": "UP", "OB": "DOWN", "OC": "RIGHT", "OD": "LEFT",
-    }
 
     def term_setup():
         fd = sys.stdin.fileno()
@@ -85,7 +63,7 @@ else:
             if not r:
                 return "ESC"
             seq = os.read(fd, 2).decode("latin-1", "ignore")
-            return _POSIX_SEQ.get(seq)
+            return POSIX_SEQ.get(seq)
         o = b[0]
         if o < 0x80:
             return _norm(chr(o))
