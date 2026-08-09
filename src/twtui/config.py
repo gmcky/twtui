@@ -4,10 +4,10 @@ import json
 import os
 import re
 import sys
+import shlex
 
 
 STREAMLINK = "streamlink"
-import shlex
 
 QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
 

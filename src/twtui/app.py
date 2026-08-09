@@ -193,46 +193,6 @@ def main():
                     typed.set()
                     break
 
-                if tok in ("UP", "DOWN"):
-                    delta = -1 if tok == "UP" else 1
-                    if mode == "list":
-                        if channels:
-                            selected = (selected + delta) % len(channels)
-                        paint_list()
-                    elif mode == "search":
-                        with lock:
-                            if st["results"]:
-                                st["sel"] = (st["sel"] + delta) % len(st["results"])
-                        paint_search()
-                    elif mode == "cats":
-                        with lock:
-                            if st["cat_results"]:
-                                st["cat_sel"] = (st["cat_sel"] + delta) % len(st["cat_results"])
-                        paint_cats()
-                    else:  # cat
-                        n = len(_filter_streams(st["cat_streams"], st["cat_ch_query"]))
-                        if n:
-                            st["cat_ch_sel"] = (st["cat_ch_sel"] + delta) % n
-                        paint_cat()
-                    continue
-
-                if tok in ("LEFT", "RIGHT"):     # switch streamers/categories
-                    if mode == "search":
-                        open_categories()
-                    elif mode == "cats":
-                        st["mode"] = "search"
-                        paint_search()
-                    continue
-
-                if tok == "TAB":                 # toggle list <-> search
-                    if mode == "list":
-                        st["mode"] = "search"
-                        paint_search()
-                    elif mode == "search":
-                        st["mode"] = "list"
-                        paint_list()
-                    continue
-
                 if mode == "settings":
                     if st["set_editing"]:
                         if tok == "ENTER":
@@ -284,6 +244,47 @@ def main():
                         st["mode"] = "list"
                         paint_list()
                     continue
+
+                if tok in ("UP", "DOWN"):
+                    delta = -1 if tok == "UP" else 1
+                    if mode == "list":
+                        if channels:
+                            selected = (selected + delta) % len(channels)
+                        paint_list()
+                    elif mode == "search":
+                        with lock:
+                            if st["results"]:
+                                st["sel"] = (st["sel"] + delta) % len(st["results"])
+                        paint_search()
+                    elif mode == "cats":
+                        with lock:
+                            if st["cat_results"]:
+                                st["cat_sel"] = (st["cat_sel"] + delta) % len(st["cat_results"])
+                        paint_cats()
+                    else:  # cat
+                        n = len(_filter_streams(st["cat_streams"], st["cat_ch_query"]))
+                        if n:
+                            st["cat_ch_sel"] = (st["cat_ch_sel"] + delta) % n
+                        paint_cat()
+                    continue
+
+                if tok in ("LEFT", "RIGHT"):     # switch streamers/categories
+                    if mode == "search":
+                        open_categories()
+                    elif mode == "cats":
+                        st["mode"] = "search"
+                        paint_search()
+                    continue
+
+                if tok == "TAB":                 # toggle list <-> search
+                    if mode == "list":
+                        st["mode"] = "search"
+                        paint_search()
+                    elif mode == "search":
+                        st["mode"] = "list"
+                        paint_list()
+                    continue
+
 
                 if mode == "cats":
                     if tok == "ENTER":
