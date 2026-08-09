@@ -1,6 +1,4 @@
 """Application: stream launch + main input loop."""
-import subprocess
-import sys
 import threading
 import time
 
@@ -11,14 +9,14 @@ from twtui.api import (
 )
 from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL
 from twtui.config import (
-    SETTINGS, SETTINGS_META, STREAMLINK, FLAGS,
+    SETTINGS, SETTINGS_META,
     load_config, save_config, load_channels, save_channels,
 )
 from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
     render_settings, _filter_streams,
 )
-from twtui.streams import launch, kill_streams, sync_state, install_exit_handlers
+from twtui.streams import launch, sync_state, install_exit_handlers
 
 
 def sort_channels(channels, status):
