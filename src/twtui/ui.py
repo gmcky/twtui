@@ -7,7 +7,7 @@ from rich.text import Text
 from rich.panel import Panel
 
 from twtui.api import OFFLINE
-from twtui.config import SETTINGS, SETTINGS_META
+from twtui.config import SETTINGS, SETTINGS_SCHEMA
 
 console = Console()
 
@@ -245,24 +245,59 @@ def render_cat(st, opened, followed):
     return Group(search_panel, body)
 
 
+def _setting_tabs(active_idx):
+    segs = []
+    for i, (name, _) in enumerate(SETTINGS_SCHEMA):
+        if i == active_idx:
+            segs.append(f"[black on yellow] {name} [/]")
+        else:
+            segs.append(f"[yellow] {name} [/]")
+    return Align.center(Text.from_markup("   ".join(segs)))
+
 def render_settings(st):
+    sec_idx = st["set_section"]
+    sec_name, fields = SETTINGS_SCHEMA[sec_idx]
+    
     table = Table(show_header=False, box=None, padding=(0, 1))
     table.add_column("", width=2)
-    table.add_column("", width=5)
+    table.add_column("", no_wrap=True)
     table.add_column("Setting")
-    for i, (key, label, help_) in enumerate(SETTINGS_META):
+    
+    for i, f in enumerate(fields):
         is_sel = i == st["set_sel"]
+        key = f["key"]
+        val = SETTINGS.get(key, "")
+        
         cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
-        on = SETTINGS[key]
-        toggle = Text("[on]" if on else "[off]", style="bold green" if on else "dim")
-        name = Text(f" {label} ", style="bold white on grey19" if is_sel else "white")
-        name.append(f"  {help_}", style="dim")
-        table.add_row(cursor, toggle, name)
-    return Panel(
+        
+        val_col = Text()
+        if f["type"] == "bool":
+            val_col.append("[on]" if val else "[off]", style="bold green" if val else "dim")
+        elif f["type"] == "choice":
+            val_col.append("‹ ", style="dim")
+            val_col.append(str(val), style="white")
+            val_col.append(" ›", style="dim")
+        elif f["type"] == "text":
+            if is_sel and st.get("set_editing"):
+                val_col.append(st["set_buf"], style="white")
+                val_col.append("▉", style="cyan")
+            else:
+                if val:
+                    val_col.append(str(val), style="white")
+                else:
+                    val_col.append("type to set…", style="dim")
+                    
+        name = Text(f" {f['label']} ", style="bold white on grey19" if is_sel else "white")
+        name.append(f"  {f['help']}", style="dim")
+        
+        table.add_row(cursor, val_col, name)
+        
+    body = Panel(
         table,
         title="[bold magenta]settings[/]",
-        subtitle="[dim]↑↓ move · enter/space toggle · esc back · ctrl+q quit[/]",
+        subtitle="[dim]↑↓ move · ←→ section · enter toggle/edit · esc back · ctrl+q quit[/]",
         border_style="magenta",
         padding=(1, 2),
     )
+    return Group(_setting_tabs(sec_idx), body)
 

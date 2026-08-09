@@ -11,7 +11,7 @@ import time
 
 import psutil
 
-from twtui.config import SETTINGS, STREAMLINK, FLAGS, STREAMS_FILE
+from twtui.config import SETTINGS, STREAMS_FILE, build_stream_cmd
 
 _open_streams = []
 _lock = threading.Lock()
@@ -28,7 +28,7 @@ def _write_state(state):
         pass
 
 def launch(channel):
-    cmd = [STREAMLINK, f"twitch.tv/{channel}", *FLAGS]
+    cmd = build_stream_cmd(channel)
     hide = SETTINGS["hide_stream_console"]
     kwargs = {}
     if sys.platform == "win32":

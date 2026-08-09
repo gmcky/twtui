@@ -9,7 +9,7 @@ from twtui.api import (
 )
 from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL
 from twtui.config import (
-    SETTINGS, SETTINGS_META,
+    SETTINGS, SETTINGS_SCHEMA,
     load_config, save_config, load_channels, save_channels,
 )
 from twtui.ui import (
@@ -38,7 +38,10 @@ def main():
     st = {
         "mode": "list",      # "list" | "search" | "cats" | "cat" | "settings"
         "query": "",         # channel search
-        "set_sel": 0,        # settings view cursor
+        "set_section": 0,
+        "set_sel": 0,
+        "set_editing": False,
+        "set_buf": "",
         "results": [],
         "sel": 0,
         "gen": 0,            # bumped on every keystroke; stale replies are dropped
@@ -206,9 +209,6 @@ def main():
                             if st["cat_results"]:
                                 st["cat_sel"] = (st["cat_sel"] + delta) % len(st["cat_results"])
                         paint_cats()
-                    elif mode == "settings":
-                        st["set_sel"] = (st["set_sel"] + delta) % len(SETTINGS_META)
-                        paint_settings()
                     else:  # cat
                         n = len(_filter_streams(st["cat_streams"], st["cat_ch_query"]))
                         if n:
@@ -234,11 +234,52 @@ def main():
                     continue
 
                 if mode == "settings":
-                    if tok == "ENTER" or char == " ":
-                        key = SETTINGS_META[st["set_sel"]][0]
-                        SETTINGS[key] = not SETTINGS[key]
-                        save_config()
+                    if st["set_editing"]:
+                        if tok == "ENTER":
+                            fields = SETTINGS_SCHEMA[st["set_section"]][1]
+                            key = fields[st["set_sel"]]["key"]
+                            SETTINGS[key] = st["set_buf"]
+                            save_config()
+                            st["set_editing"] = False
+                            paint_settings()
+                        elif tok == "ESC":
+                            st["set_editing"] = False
+                            paint_settings()
+                        elif tok == "BACKSPACE":
+                            st["set_buf"] = st["set_buf"][:-1]
+                            paint_settings()
+                        elif char is not None:
+                            st["set_buf"] += char
+                            paint_settings()
+                        continue
+                    
+                    fields = SETTINGS_SCHEMA[st["set_section"]][1]
+                    if tok in ("UP", "DOWN"):
+                        delta = -1 if tok == "UP" else 1
+                        st["set_sel"] = (st["set_sel"] + delta) % len(fields)
                         paint_settings()
+                    elif tok in ("LEFT", "RIGHT"):
+                        delta = -1 if tok == "LEFT" else 1
+                        st["set_section"] = (st["set_section"] + delta) % len(SETTINGS_SCHEMA)
+                        st["set_sel"] = 0
+                        paint_settings()
+                    elif tok == "ENTER" or char == " ":
+                        f = fields[st["set_sel"]]
+                        key = f["key"]
+                        if f["type"] == "bool":
+                            SETTINGS[key] = not SETTINGS[key]
+                            save_config()
+                            paint_settings()
+                        elif f["type"] == "choice":
+                            opts = f["choices"]
+                            idx = opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
+                            SETTINGS[key] = opts[(idx + 1) % len(opts)]
+                            save_config()
+                            paint_settings()
+                        elif f["type"] == "text":
+                            st["set_editing"] = True
+                            st["set_buf"] = SETTINGS[key]
+                            paint_settings()
                     elif tok == "ESC":
                         st["mode"] = "list"
                         paint_list()
@@ -363,7 +404,9 @@ def main():
                         paint_search()
                     elif hot == "s":             # settings
                         st["mode"] = "settings"
+                        st["set_section"] = 0
                         st["set_sel"] = 0
+                        st["set_editing"] = False
                         paint_settings()
                     elif hot == "r":
                         live.auto_refresh = True

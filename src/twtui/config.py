@@ -7,18 +7,47 @@ import sys
 
 
 STREAMLINK = "streamlink"
-FLAGS = ["best", "--twitch-low-latency", "--hls-live-edge", "1"]
+import shlex
 
-# Runtime settings, editable in the settings view and persisted to config.json.
+QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
+
 SETTINGS = {
-    "hide_stream_console": False,   # run streamlink with no console window
-    "kill_streams_on_exit": False,  # terminate launched streams when client exits
+    # General
+    "kill_streams_on_exit": False,
+    "kill_orphans_on_start": False,
+    "kill_all_streams_on_start": False,
+    "confirm_before_quit": False,
+    # Streamlink
+    "quality": "best",
+    "low_latency": True,
+    "hide_stream_console": False,
+    "custom_flags": "",
 }
-# (key, label, help) in display order.
-SETTINGS_META = [
-    ("hide_stream_console", "Hide streamlink console", "run streams without a console window"),
-    ("kill_streams_on_exit", "Kill streams on exit", "close all open streams when you quit"),
+
+SETTINGS_SCHEMA = [
+    ("General", [
+        {"key": "kill_streams_on_exit",     "type": "bool",   "label": "Kill streams on exit",        "help": "close all open streams when you quit"},
+        {"key": "kill_orphans_on_start",    "type": "bool",   "label": "Kill ended streams on start", "help": "on launch, close players whose stream already ended"},
+        {"key": "kill_all_streams_on_start","type": "bool",   "label": "Kill all streams on start",   "help": "on launch, close every stream left from last session"},
+        {"key": "confirm_before_quit",      "type": "bool",   "label": "Confirm before quit",         "help": "ask before quitting if streams are open"},
+    ]),
+    ("Streamlink", [
+        {"key": "quality",             "type": "choice", "choices": QUALITY_CHOICES, "label": "Quality",            "help": "stream quality passed to streamlink"},
+        {"key": "low_latency",         "type": "bool",   "label": "Low latency",        "help": "--twitch-low-latency (nearer live edge)"},
+        {"key": "hide_stream_console", "type": "bool",   "label": "Hide streamlink console", "help": "run streams without a console window"},
+        {"key": "custom_flags",        "type": "text",   "label": "Custom flags",       "help": "extra streamlink args, space-separated"},
+    ]),
+    # ("Chat", [...])
 ]
+
+def build_stream_cmd(channel):
+    args = [STREAMLINK, f"twitch.tv/{channel}", SETTINGS["quality"]]
+    if SETTINGS["low_latency"]:
+        args += ["--twitch-low-latency", "--hls-live-edge", "1"]
+    extra = SETTINGS["custom_flags"].strip()
+    if extra:
+        args += shlex.split(extra)
+    return args
 
 
 # App dir (frozen exe or source); used only to find a legacy channels.txt / *.bat.
@@ -57,8 +86,19 @@ def load_config():
     except Exception:
         return
     for k in SETTINGS:
-        if isinstance(data.get(k), bool):
-            SETTINGS[k] = data[k]
+        if k in data:
+            val = data[k]
+            # Validate per type
+            for sec_name, fields in SETTINGS_SCHEMA:
+                for f in fields:
+                    if f["key"] == k:
+                        if f["type"] == "bool" and isinstance(val, bool):
+                            SETTINGS[k] = val
+                        elif f["type"] == "choice" and val in f.get("choices", []):
+                            SETTINGS[k] = val
+                        elif f["type"] == "text" and isinstance(val, str):
+                            SETTINGS[k] = val
+                        break
 
 
 def save_config():
