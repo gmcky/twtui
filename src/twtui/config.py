@@ -48,6 +48,7 @@ CHANNELS_FILE = os.environ.get("TWITCH_TUI_CHANNELS") or os.path.join(_config_di
 CHANNELS_HEADER = "# One Twitch channel per line. Blank lines and #comments ignored.\n"
 
 CONFIG_FILE = os.path.join(_config_dir(), "config.json")
+STREAMS_FILE = os.path.join(_config_dir(), "open_streams.json")
 
 
 def load_config():

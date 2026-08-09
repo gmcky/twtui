@@ -18,33 +18,7 @@ from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
     render_settings, _filter_streams,
 )
-
-_children = []                 # Popen handles of launched streams
-
-
-def launch(channel):
-    # Start streamlink detached so the menu keeps running and multiple streams
-    # can be open at once. Tracked so KILL_STREAMS_ON_EXIT can clean up.
-    cmd = [STREAMLINK, f"twitch.tv/{channel}", *FLAGS]
-    hide = SETTINGS["hide_stream_console"]
-    kwargs = {}
-    if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW if hide else subprocess.CREATE_NEW_CONSOLE
-    else:
-        kwargs["start_new_session"] = True   # detach from our controlling terminal
-        if hide:
-            kwargs["stdout"] = kwargs["stderr"] = subprocess.DEVNULL
-    _children.append(subprocess.Popen(cmd, **kwargs))
-
-
-def kill_streams():
-    # Best-effort terminate of launched streams (used only when the toggle is on).
-    for p in _children:
-        if p.poll() is None:
-            try:
-                p.terminate()
-            except Exception:
-                pass
+from twtui.streams import launch, kill_streams, sync_state, install_exit_handlers
 
 
 def sort_channels(channels, status):
@@ -53,6 +27,7 @@ def sort_channels(channels, status):
 
 def main():
     load_config()
+    install_exit_handlers()
     channels = load_channels()   # may be empty on a fresh install — that's fine,
                                  # follow channels from the search view (tab / →)
 
@@ -155,6 +130,18 @@ def main():
 
         worker = threading.Thread(target=search_worker, daemon=True)
         worker.start()
+
+        def sync_worker():
+            while not st["stop"]:
+                for _ in range(50):
+                    if st["stop"]:
+                        break
+                    time.sleep(0.1)
+                if not st["stop"]:
+                    sync_state()
+
+        sync_th = threading.Thread(target=sync_worker, daemon=True)
+        sync_th.start()
 
         status = get_status(channels)
         sort_channels(channels, status)
@@ -394,7 +381,4 @@ def main():
                         break
         finally:
             term_restore(term_state)
-
-    if SETTINGS["kill_streams_on_exit"]:
-        kill_streams()
 

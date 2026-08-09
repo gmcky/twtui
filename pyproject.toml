@@ -11,7 +11,7 @@ requires-python = ">=3.9"
 license = { text = "MIT" }
 authors = [{ name = "gmcky" }]
 keywords = ["twitch", "tui", "terminal", "streamlink", "cli"]
-dependencies = ["rich>=13", "requests>=2"]
+dependencies = ["rich>=13", "requests>=2", "psutil>=5.9"]
 
 [project.scripts]
 twtui = "twtui.app:main"
