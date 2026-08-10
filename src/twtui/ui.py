@@ -16,7 +16,7 @@ def loading_panel(msg="checking channels"):
     spinner = Spinner("dots", text=Text(f" {msg} …", style="cyan"), style=THEME["accent"])
     return Panel(
         Align.center(spinner, vertical="middle"),
-        title="[bold {THEME['accent']}]twitch — followed channels[/]",
+        title=f"[bold {THEME['accent']}]twitch — followed channels[/]",
         border_style=THEME["accent"],
         padding=(2, 4),
     )
@@ -152,14 +152,14 @@ def render_search(st, opened, followed):
     query_text = Text.assemble(("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"]))
     search_panel = Panel(
         query_text,
-        title="[bold {THEME['accent']}]search twitch[/]",
+        title=f"[bold {THEME['accent']}]search twitch[/]",
         subtitle="[dim]type · ←/→ switch · ↑↓ move · enter watch · ctrl+f follow · esc list · ctrl+q quit[/]",
         border_style=THEME["accent"],
         padding=(0, 1),
     )
 
     results = st["results"]
-    title = "[bold {THEME['accent']}]streamers[/]"
+    title = f"[bold {THEME['accent']}]streamers[/]"
     if st["searching"] and not results:
         inner = Align.center(
             Spinner("dots", text=Text(" searching …", style="cyan"), style=THEME["accent"]),
@@ -182,13 +182,13 @@ def render_cats(st):
     query_text = Text.assemble(("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"]))
     search_panel = Panel(
         query_text,
-        title="[bold {THEME['accent']}]search categories[/]",
+        title=f"[bold {THEME['accent']}]search categories[/]",
         subtitle="[dim]type · ←/→ switch · ↑↓ move · enter open · esc back · ctrl+q quit[/]",
         border_style=THEME["accent"],
         padding=(0, 1),
     )
     results = st["cat_results"]
-    title = "[bold {THEME['accent']}]categories[/]"
+    title = f"[bold {THEME['accent']}]categories[/]"
     if st["cat_searching"] and not results:
         inner = Align.center(
             Spinner("dots", text=Text(" loading …", style="cyan"), style=THEME["accent"]),
@@ -228,7 +228,7 @@ def render_cat(st, opened, followed):
         border_style=THEME["accent"],
         padding=(0, 1),
     )
-    title = "[bold {THEME['accent']}]channels[/]"
+    title = f"[bold {THEME['accent']}]channels[/]"
     if st["cat_searching"] and not st["cat_streams"]:
         inner = Align.center(
             Spinner("dots", text=Text(" loading …", style="cyan"), style=THEME["accent"]),
@@ -311,7 +311,7 @@ def render_settings(st):
         
     body = Panel(
         table,
-        title="[bold {THEME['accent']}]settings[/]",
+        title=f"[bold {THEME['accent']}]settings[/]",
         subtitle="[dim]↑↓ move · ←→ section · enter toggle/edit · esc back · ctrl+q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
