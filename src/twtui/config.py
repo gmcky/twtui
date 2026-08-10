@@ -196,10 +196,10 @@ def save_config():
             )
             app_name = "TwitchTUI"
             if SETTINGS.get("run_on_startup"):
-                cmd = f'"{sys.executable}"'
-                if not getattr(sys, "frozen", False) and sys.argv and sys.argv[0]:
-                    if not sys.argv[0].startswith("-"):
-                        cmd = f'"{sys.executable}" "{os.path.abspath(sys.argv[0])}"'
+                if getattr(sys, "frozen", False):
+                    cmd = f'"{sys.executable}"'
+                else:
+                    cmd = f'"{sys.executable}" -m twtui.app'
                 winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
             else:
                 try:
