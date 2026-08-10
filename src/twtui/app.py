@@ -484,8 +484,6 @@ def main():
                         if res:
                             follow_toggle(res)
                             paint_search()
-                    elif tok == "CTRL_G":
-                        open_categories()
                     elif tok == "ESC":
                         st["mode"] = "list"
                         paint_list()
@@ -510,8 +508,6 @@ def main():
                         launch(channels[selected])
                         opened.add(channels[selected])
                         paint_list()
-                elif tok == "CTRL_G":
-                    open_categories()
                 elif tok == "ESC":
                     request_quit()
                     if st["stop"]:

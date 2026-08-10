@@ -70,7 +70,7 @@ def render(channels, status, selected, checking, opened):
     body = Panel(
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
-        subtitle="[dim]↑↓ move · enter watch · f unfollow · r refresh · tab search · ctrl+g games · s settings · q quit[/]",
+        subtitle="[dim]↑↓ move · enter watch · f unfollow · r refresh · tab search · s settings · q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
     )

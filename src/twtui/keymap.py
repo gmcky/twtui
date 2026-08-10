@@ -9,12 +9,12 @@ FOLD = {"й": "q", "к": "r", "а": "f", "ы": "s"}
 
 # Normalised special-key tokens returned by read_key().
 SPECIAL = {"UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESC",
-           "BACKSPACE", "TAB", "CTRL_F", "CTRL_G", "CTRL_Q"}
+           "BACKSPACE", "TAB", "CTRL_F", "CTRL_Q"}
 
 # Raw control characters -> tokens.
 CTRL = {
     "\r": "ENTER", "\n": "ENTER", "\x1b": "ESC", "\x7f": "BACKSPACE",
-    "\x08": "BACKSPACE", "\t": "TAB", "\x06": "CTRL_F", "\x07": "CTRL_G",
+    "\x08": "BACKSPACE", "\t": "TAB", "\x06": "CTRL_F",
     "\x11": "CTRL_Q",
 }
 
