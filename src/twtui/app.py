@@ -14,7 +14,7 @@ from twtui.config import (
 )
 from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
-    render_settings, _filter_streams,
+    render_settings, _filter_streams, render_confirm,
 )
 from twtui.streams import launch, sync_state, install_exit_handlers, cleanup_on_start
 
@@ -59,6 +59,7 @@ def main():
         "cat_ch_query": "",
         "cat_ch_sel": 0,
         "stop": False,
+        "confirm_quit": False,
     }
     lock = threading.Lock()
     typed = threading.Event()
@@ -79,6 +80,14 @@ def main():
 
         def paint_cat():
             live.update(render_cat(st, opened, followed), refresh=True)
+
+        def request_quit():
+            if SETTINGS.get("confirm_before_quit") and opened:
+                st["confirm_quit"] = True
+                live.update(render_confirm(len(opened)), refresh=True)
+            else:
+                st["stop"] = True
+                typed.set()
 
         def search_worker():
             # Debounce keystrokes, query Twitch off-thread, repaint. Serves the two
@@ -186,13 +195,35 @@ def main():
                 tok = read_key()
                 if tok is None:
                     continue
+
+                if st.get("confirm_quit"):
+                    if tok in ("y", "й", "ENTER"):
+                        st["stop"] = True
+                        typed.set()
+                        break
+                    elif tok in ("n", "ESC"):
+                        st["confirm_quit"] = False
+                        mode = st["mode"]
+                        if mode == "list":
+                            paint_list()
+                        elif mode == "search":
+                            paint_search()
+                        elif mode == "cats":
+                            paint_cats()
+                        elif mode == "cat":
+                            paint_cat()
+                        elif mode == "settings":
+                            paint_settings()
+                    continue
+
                 mode = st["mode"]
                 char = tok if tok not in SPECIAL else None
 
                 if tok == "CTRL_Q":
-                    st["stop"] = True
-                    typed.set()
-                    break
+                    request_quit()
+                    if st["stop"]:
+                        break
+                    continue
 
                 if mode == "settings":
                     if st["set_editing"]:
@@ -387,9 +418,9 @@ def main():
                 elif tok == "CTRL_G":
                     open_categories()
                 elif tok == "ESC":
-                    st["stop"] = True
-                    typed.set()
-                    break
+                    request_quit()
+                    if st["stop"]:
+                        break
                 else:
                     hot = _hotkey(char) if char else None
                     if hot == "f":               # unfollow selected channel
@@ -419,9 +450,9 @@ def main():
                         live.auto_refresh = False
                         paint_list()
                     elif hot == "q":
-                        st["stop"] = True
-                        typed.set()
-                        break
+                        request_quit()
+                        if st["stop"]:
+                            break
         finally:
             term_restore(term_state)
 

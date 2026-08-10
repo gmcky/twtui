@@ -301,3 +301,15 @@ def render_settings(st):
     )
     return Group(_setting_tabs(sec_idx), body)
 
+
+def render_confirm(open_count):
+    msg = f"Quit? {open_count} stream{'s' if open_count != 1 else ''} still open — [y]es / [n]o"
+    return Align.center(
+        Panel(
+            Text(msg, justify="center"),
+            border_style="yellow",
+            padding=(1, 4)
+        ),
+        vertical="middle"
+    )
+
