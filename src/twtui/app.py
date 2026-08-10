@@ -17,7 +17,10 @@ from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
     render_settings, _filter_streams, render_confirm,
 )
-from twtui.streams import launch, sync_state, install_exit_handlers, cleanup_on_start
+from twtui.streams import (
+    launch, sync_state, cleanup_on_start, install_exit_handlers,
+    stream_alive, LAUNCH_GRACE,
+)
 
 
 def sort_channels(channels, status):
@@ -64,6 +67,7 @@ def main():
         "cat_ch_sel": 0,
         "stop": False,
         "confirm_quit": False,
+        "failed": {},
     }
     lock = threading.Lock()
     typed = threading.Event()
@@ -71,7 +75,7 @@ def main():
     with Live(loading_panel(), console=console, screen=True, auto_refresh=True, refresh_per_second=12) as live:
 
         def paint_list():
-            live.update(render(channels, status, selected, False, opened), refresh=True)
+            live.update(render(channels, status, selected, False, opened, st["failed"]), refresh=True)
 
         def paint_settings():
             live.update(render_settings(st), refresh=True)
@@ -84,6 +88,26 @@ def main():
 
         def paint_cat():
             live.update(render_cat(st, opened, followed), refresh=True)
+
+        def watch_launch(ch, entry):
+            time.sleep(LAUNCH_GRACE)
+            if st["stop"]:
+                return
+            if not stream_alive(entry):
+                with lock:
+                    opened.discard(ch)
+                    st["failed"][ch] = time.time()
+                m = st["mode"]
+                if m == "list": paint_list()
+                elif m == "search": paint_search()
+                elif m == "cat": paint_cat()
+
+        def do_launch(ch, repaint):
+            entry = launch(ch)
+            opened.add(ch)
+            st["failed"].pop(ch, None)
+            repaint()
+            threading.Thread(target=watch_launch, args=(ch, entry), daemon=True).start()
 
         def request_quit():
             if SETTINGS.get("confirm_before_quit") and opened:
@@ -154,6 +178,10 @@ def main():
                     time.sleep(0.1)
                 if not st["stop"]:
                     sync_state()
+                    now = time.time()
+                    with lock:
+                        for c in [c for c, ts in st["failed"].items() if now - ts > 6]:
+                            del st["failed"][c]
 
         sync_th = threading.Thread(target=sync_worker, daemon=True)
         sync_th.start()
@@ -449,9 +477,7 @@ def main():
                     if tok == "ENTER":
                         res = filtered[st["cat_ch_sel"]] if filtered else None
                         if res:
-                            launch(res["login"])
-                            opened.add(res["login"])
-                            paint_cat()
+                            do_launch(res["login"], paint_cat)
                     elif tok == "CTRL_F":
                         res = filtered[st["cat_ch_sel"]] if filtered else None
                         if res:
@@ -475,9 +501,7 @@ def main():
                         with lock:
                             res = st["results"][st["sel"]] if st["results"] else None
                         if res:
-                            launch(res["login"])
-                            opened.add(res["login"])
-                            paint_search()
+                            do_launch(res["login"], paint_search)
                     elif tok == "CTRL_F":
                         with lock:
                             res = st["results"][st["sel"]] if st["results"] else None
@@ -505,9 +529,7 @@ def main():
                 # --- list mode (hotkeys matched by physical key, any layout) ---
                 if tok == "ENTER":
                     if channels:
-                        launch(channels[selected])
-                        opened.add(channels[selected])
-                        paint_list()
+                        do_launch(channels[selected], paint_list)
                 elif tok == "ESC":
                     request_quit()
                     if st["stop"]:

@@ -22,7 +22,7 @@ def loading_panel(msg="checking channels"):
     )
 
 
-def render(channels, status, selected, checking, opened):
+def render(channels, status, selected, checking, opened, failed):
     table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
     table.add_column("", width=2, no_wrap=True)
     table.add_column("", width=2, no_wrap=True)
@@ -45,8 +45,13 @@ def render(channels, status, selected, checking, opened):
             dot, tag, tag_style = "○", "off", "dim"
 
         cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
-        name_style = "bold white on grey19" if is_sel else "white"
-        watching = Text("▶ open", style=f"bold {THEME['open']}") if ch in opened else Text("")
+        name_style = f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
+        if ch in failed:
+            watching = Text("✗ failed", style="bold red")
+        elif ch in opened:
+            watching = Text("▶ open", style=f"bold {THEME['open']}")
+        else:
+            watching = Text("")
         viewers = f"{meta['viewers']:,}" if (not checking and live) else ""
         game = meta["game"] if (not checking and live) else ""
         name = Text(f" {ch} ", style=name_style)
@@ -112,7 +117,8 @@ def _tabs(active):
     return Align.center(Text.from_markup(seg("Streamers", "search") + "   " + seg("Categories", "cats")))
 
 
-def _channel_table(results, sel, opened, followed):
+def _channel_table(results, sel, opened, followed, failed=None):
+    if failed is None: failed = {}
     # Shared by the search view and the in-category view.
     table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
     table.add_column("", width=2, no_wrap=True)
@@ -132,7 +138,9 @@ def _channel_table(results, sel, opened, followed):
         watching = Text()
         if res["login"].lower() in followed:
             watching.append("★ ", style=THEME["open"])
-        if res["login"] in opened:
+        if res["login"] in failed:
+            watching.append("✗ failed", style="bold red")
+        elif res["login"] in opened:
             watching.append("▶ open", style=f"bold {THEME['open']}")
         # login + dim display name when they differ.
         name = Text(f" {res['login']} ", style=name_style)
@@ -170,7 +178,7 @@ def render_search(st, opened, followed):
         inner = Align.center(Text(msg, style="dim"), vertical="middle")
     else:
         vis, rsel, start, end = _window(results, st["sel"], _max_rows(9))
-        inner = _channel_table(vis, rsel, opened, followed)
+        inner = _channel_table(vis, rsel, opened, followed, st.get("failed", {}))
         title = _scroll_title("streamers", start, end, len(results))
 
     results_panel = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
@@ -219,28 +227,35 @@ def render_cats(st):
 
 def render_cat(st, opened, followed):
     q = st["cat_ch_query"]
-    filtered = _filter_streams(st["cat_streams"], q)
+    streams = st["cat_streams"]
+    g = st["game_display"]
     query_text = Text.assemble(("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"]))
     search_panel = Panel(
         query_text,
-        title=f"[bold {THEME['accent']}]{st['game_display']} — top channels[/]",
+        title=f"[bold {THEME['accent']}]{g} — top channels[/]",
         subtitle="[dim]filter · ↑↓ move · enter watch · ctrl+f follow · esc categories · ctrl+q quit[/]",
         border_style=THEME["accent"],
         padding=(0, 1),
     )
     title = f"[bold {THEME['accent']}]channels[/]"
-    if st["cat_searching"] and not st["cat_streams"]:
+    if st["cat_searching"] and not streams:
         inner = Align.center(
             Spinner("dots", text=Text(" loading …", style="cyan"), style=THEME["accent"]),
             vertical="middle",
         )
-    elif not filtered:
-        msg = "no live channels" if not st["cat_streams"] else "no matches"
-        inner = Align.center(Text(msg, style="dim"), vertical="middle")
+    elif not streams:
+        inner = Align.center(
+            Text(f"no streams found for '{g}'", style="dim"),
+            vertical="middle",
+        )
     else:
-        vis, rsel, start, end = _window(filtered, st["cat_ch_sel"], _max_rows(8))
-        inner = _channel_table(vis, rsel, opened, followed)
-        title = _scroll_title("channels", start, end, len(filtered))
+        filtered = _filter_streams(streams, q)
+        if not filtered:
+            inner = Align.center(Text(f"no streams match '{q}'", style="dim"), vertical="middle")
+        else:
+            vis, rsel, start, end = _window(filtered, st["cat_ch_sel"], _max_rows(8))
+            inner = _channel_table(vis, rsel, opened, followed, st.get("failed", {}))
+            title = _scroll_title("channels", start, end, len(filtered))
     body = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
     return Group(search_panel, body)
 

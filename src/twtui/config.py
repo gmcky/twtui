@@ -96,7 +96,10 @@ def build_stream_cmd(channel):
         args += ["--twitch-low-latency", "--hls-live-edge", "1"]
     extra = SETTINGS["custom_flags"].strip()
     if extra:
-        args += shlex.split(extra)
+        try:
+            args += shlex.split(extra)
+        except ValueError:
+            pass
     return args
 
 

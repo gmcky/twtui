@@ -27,6 +27,17 @@ def _write_state(state):
     except Exception:
         pass
 
+LAUNCH_GRACE = 2.5
+
+def stream_alive(entry):
+    if not entry:
+        return False
+    try:
+        p = psutil.Process(entry["slink_pid"])
+        return p.create_time() == entry["slink_create"]
+    except psutil.Error:
+        return False
+
 def launch(channel):
     cmd = build_stream_cmd(channel)
     hide = SETTINGS["hide_stream_console"]
@@ -53,8 +64,9 @@ def launch(channel):
         with _lock:
             _open_streams.append(entry)
         sync_state()
+        return entry
     except Exception:
-        pass
+        return None
 
 def sync_state():
     with _lock:
