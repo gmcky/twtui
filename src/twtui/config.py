@@ -185,6 +185,31 @@ def save_config():
     except Exception:
         pass
 
+    if sys.platform == "win32":
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_SET_VALUE
+            )
+            app_name = "TwitchTUI"
+            if SETTINGS.get("run_on_startup"):
+                cmd = f'"{sys.executable}"'
+                if not getattr(sys, "frozen", False) and sys.argv and sys.argv[0]:
+                    if not sys.argv[0].startswith("-"):
+                        cmd = f'"{sys.executable}" "{os.path.abspath(sys.argv[0])}"'
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
+            else:
+                try:
+                    winreg.DeleteValue(key, app_name)
+                except FileNotFoundError:
+                    pass
+            winreg.CloseKey(key)
+        except Exception:
+            pass
+
 
 def _read_channels(path):
     chans = []
