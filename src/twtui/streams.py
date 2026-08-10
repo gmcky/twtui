@@ -140,6 +140,65 @@ def kill_streams():
         except Exception:
             pass
 
+def cleanup_on_start():
+    try:
+        if not os.path.exists(STREAMS_FILE):
+            return
+        with open(STREAMS_FILE, "r", encoding="utf-8") as f:
+            prev = json.load(f)
+        if not isinstance(prev, list):
+            prev = []
+    except Exception:
+        prev = []
+
+    kill_all = SETTINGS.get("kill_all_streams_on_start", False)
+    kill_orphans = SETTINGS.get("kill_orphans_on_start", False)
+
+    for entry in prev:
+        slink_pid = entry.get("slink_pid")
+        slink_create = entry.get("slink_create")
+        player_pid = entry.get("player_pid")
+        player_create = entry.get("player_create")
+
+        slink_alive = False
+        if slink_pid is not None:
+            try:
+                proc = psutil.Process(slink_pid)
+                if proc.create_time() == slink_create:
+                    slink_alive = True
+            except psutil.Error:
+                pass
+
+        player_alive = False
+        if player_pid is not None:
+            try:
+                proc = psutil.Process(player_pid)
+                if proc.create_time() == player_create:
+                    player_alive = True
+            except psutil.Error:
+                pass
+
+        if kill_all:
+            if slink_pid is not None:
+                kill_tree(slink_pid, slink_create)
+            if player_pid is not None:
+                try:
+                    p = psutil.Process(player_pid)
+                    if p.create_time() == player_create:
+                        kill_tree(player_pid, player_create)
+                except psutil.Error:
+                    pass
+        elif kill_orphans:
+            if (not slink_alive) and player_alive:
+                if player_pid is not None:
+                    kill_tree(player_pid, player_create)
+
+    try:
+        if os.path.exists(STREAMS_FILE):
+            os.remove(STREAMS_FILE)
+    except Exception:
+        pass
+
 def install_exit_handlers():
     atexit.register(kill_streams)
     

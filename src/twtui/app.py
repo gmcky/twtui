@@ -16,7 +16,7 @@ from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
     render_settings, _filter_streams,
 )
-from twtui.streams import launch, sync_state, install_exit_handlers
+from twtui.streams import launch, sync_state, install_exit_handlers, cleanup_on_start
 
 
 def sort_channels(channels, status):
@@ -26,6 +26,7 @@ def sort_channels(channels, status):
 def main():
     load_config()
     install_exit_handlers()
+    cleanup_on_start()
     channels = load_channels()   # may be empty on a fresh install — that's fine,
                                  # follow channels from the search view (tab / →)
 
