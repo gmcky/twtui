@@ -18,7 +18,7 @@ def _hotkey(ch):
     rev = {bound: action for action, bound in KEYBINDS.items()}
     if norm in rev:
         return rev[norm]
-    return ch
+    return None
 
 
 def _norm(ch):
