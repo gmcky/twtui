@@ -254,7 +254,45 @@ def _setting_tabs(active_idx):
             segs.append(f"[{THEME['tab']}] {name} [/]")
     return Align.center(Text.from_markup("   ".join(segs)))
 
+def _render_picker(st):
+    sec = SETTINGS_SCHEMA[st["set_section"]]
+    f = sec[1][st["set_sel"]]
+    opts = f["choices"]
+    
+    vis, rsel, start, end = _window(opts, st["pick_sel"], _max_rows(8))
+    table = Table(show_header=False, box=None, padding=(0, 1))
+    
+    for i, opt in enumerate(vis):
+        is_sel = (i == rsel)
+        cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
+        
+        label = Text()
+        if f["type"] == "color":
+            label.append(str(opt), style=opt)
+            label.append(" ")
+            label.append("  ", style=f"on {opt}")
+        else:
+            style = f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
+            label.append(str(opt), style=style)
+            
+        if opt == SETTINGS.get(f["key"]):
+            label.append(" ● current", style="dim")
+            
+        table.add_row(cursor, label)
+        
+    panel = Panel(
+        table,
+        title=_scroll_title(f["label"], start, end, len(opts)),
+        subtitle="[dim]↑↓ move · enter select · esc cancel[/]",
+        border_style=THEME["accent"],
+        padding=(1, 2)
+    )
+    return Align.center(panel, vertical="middle")
+
 def render_settings(st):
+    if st.get("set_picking"):
+        return _render_picker(st)
+
     sec_idx = st["set_section"]
     sec_name, fields = SETTINGS_SCHEMA[sec_idx]
     

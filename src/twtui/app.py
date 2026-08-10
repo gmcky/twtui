@@ -45,6 +45,8 @@ def main():
         "set_editing": False,
         "set_buf": "",
         "set_capturing": False,
+        "set_picking": False,
+        "pick_sel": 0,
         "results": [],
         "sel": 0,
         "gen": 0,            # bumped on every keystroke; stale replies are dropped
@@ -251,6 +253,28 @@ def main():
                     continue
 
                 if mode == "settings":
+                    if st.get("set_picking"):
+                        fields = SETTINGS_SCHEMA[st["set_section"]][1]
+                        f = fields[st["set_sel"]]
+                        opts = f["choices"]
+                        if tok == "UP":
+                            st["pick_sel"] = (st["pick_sel"] - 1) % len(opts)
+                            paint_settings()
+                        elif tok == "DOWN":
+                            st["pick_sel"] = (st["pick_sel"] + 1) % len(opts)
+                            paint_settings()
+                        elif tok == "ENTER":
+                            SETTINGS[f["key"]] = opts[st["pick_sel"]]
+                            save_config()
+                            rebuild_theme()
+                            rebuild_keybinds()
+                            st["set_picking"] = False
+                            paint_settings()
+                        elif tok == "ESC":
+                            st["set_picking"] = False
+                            paint_settings()
+                        continue
+
                     if st.get("set_capturing"):
                         if tok == "ESC":
                             st["set_capturing"] = False
@@ -329,11 +353,8 @@ def main():
                             paint_settings()
                         elif f["type"] in ("choice", "color"):
                             opts = f["choices"]
-                            idx = opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
-                            SETTINGS[key] = opts[(idx + 1) % len(opts)]
-                            save_config()
-                            rebuild_theme()
-                            rebuild_keybinds()
+                            st["pick_sel"] = opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
+                            st["set_picking"] = True
                             paint_settings()
                         elif f["type"] == "text":
                             st["set_editing"] = True
