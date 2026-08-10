@@ -7,7 +7,7 @@ from rich.live import Live
 from twtui.api import (
     OFFLINE, get_status, twitch_search, top_games, search_games, game_streams,
 )
-from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL
+from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL, FOLD
 from twtui.config import (
     SETTINGS, SETTINGS_SCHEMA,
     load_config, save_config, load_channels, save_channels,
@@ -43,6 +43,7 @@ def main():
         "set_sel": 0,
         "set_editing": False,
         "set_buf": "",
+        "set_capturing": False,
         "results": [],
         "sel": 0,
         "gen": 0,            # bumped on every keystroke; stale replies are dropped
@@ -226,11 +227,39 @@ def main():
                     continue
 
                 if mode == "settings":
+                    if st.get("set_capturing"):
+                        if tok == "ESC":
+                            st["set_capturing"] = False
+                            paint_settings()
+                            continue
+                        if tok in SPECIAL or char is None or len(char) != 1:
+                            continue
+                        norm_char = FOLD.get(char.lower(), char.lower())
+                        used = {SETTINGS[k] for k in SETTINGS if k.startswith("key_")}
+                        if norm_char in used:
+                            continue
+                        
+                        fields = SETTINGS_SCHEMA[st["set_section"]][1]
+                        key = fields[st["set_sel"]]["key"]
+                        SETTINGS[key] = norm_char
+                        save_config()
+                        st["set_capturing"] = False
+                        paint_settings()
+                        continue
+                        
                     if st["set_editing"]:
                         if tok == "ENTER":
                             fields = SETTINGS_SCHEMA[st["set_section"]][1]
-                            key = fields[st["set_sel"]]["key"]
-                            SETTINGS[key] = st["set_buf"]
+                            f = fields[st["set_sel"]]
+                            key = f["key"]
+                            if f["type"] == "int":
+                                try:
+                                    val = int(st["set_buf"])
+                                except ValueError:
+                                    val = SETTINGS[key]
+                                SETTINGS[key] = max(f["min"], min(f["max"], val))
+                            else:
+                                SETTINGS[key] = st["set_buf"]
                             save_config()
                             st["set_editing"] = False
                             paint_settings()
@@ -241,8 +270,14 @@ def main():
                             st["set_buf"] = st["set_buf"][:-1]
                             paint_settings()
                         elif char is not None:
-                            st["set_buf"] += char
-                            paint_settings()
+                            fields = SETTINGS_SCHEMA[st["set_section"]][1]
+                            if fields[st["set_sel"]]["type"] == "int":
+                                if char.isdigit():
+                                    st["set_buf"] += char
+                                    paint_settings()
+                            else:
+                                st["set_buf"] += char
+                                paint_settings()
                         continue
                     
                     fields = SETTINGS_SCHEMA[st["set_section"]][1]
@@ -262,7 +297,7 @@ def main():
                             SETTINGS[key] = not SETTINGS[key]
                             save_config()
                             paint_settings()
-                        elif f["type"] == "choice":
+                        elif f["type"] in ("choice", "color"):
                             opts = f["choices"]
                             idx = opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
                             SETTINGS[key] = opts[(idx + 1) % len(opts)]
@@ -271,6 +306,13 @@ def main():
                         elif f["type"] == "text":
                             st["set_editing"] = True
                             st["set_buf"] = SETTINGS[key]
+                            paint_settings()
+                        elif f["type"] == "int" and tok == "ENTER":
+                            st["set_editing"] = True
+                            st["set_buf"] = str(SETTINGS[key])
+                            paint_settings()
+                        elif f["type"] == "key" and tok == "ENTER":
+                            st["set_capturing"] = True
                             paint_settings()
                     elif tok == "ESC":
                         st["mode"] = "list"

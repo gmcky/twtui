@@ -286,6 +286,23 @@ def render_settings(st):
                     val_col.append(str(val), style="white")
                 else:
                     val_col.append("type to set…", style="dim")
+        elif f["type"] == "int":
+            if is_sel and st.get("set_editing"):
+                val_col.append(st["set_buf"], style="white")
+                val_col.append("▉", style="cyan")
+            else:
+                val_col.append(f"{val}{f.get('unit', '')}", style="white")
+        elif f["type"] == "color":
+            val_col.append("‹ ", style="dim")
+            val_col.append(str(val), style=str(val))
+            val_col.append(" ", style="dim")
+            val_col.append("  ", style=f"on {val}")
+            val_col.append(" ›", style="dim")
+        elif f["type"] == "key":
+            if is_sel and st.get("set_capturing"):
+                val_col.append("press a key…", style="cyan")
+            else:
+                val_col.append(str(val), style="white")
                     
         name = Text(f" {f['label']} ", style="bold white on grey19" if is_sel else "white")
         name.append(f"  {f['help']}", style="dim")

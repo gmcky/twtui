@@ -22,7 +22,33 @@ SETTINGS = {
     "low_latency": True,
     "hide_stream_console": False,
     "custom_flags": "",
+    # Appearance
+    "color_accent":       "magenta",
+    "color_cursor":       "cyan",
+    "color_live":         "green",
+    "color_tab":          "yellow",
+    "color_open":         "yellow",
+    "color_highlight_bg": "grey19",
+    # Lists
+    "list_autorefresh_secs": 0,
+    "search_results":        15,
+    "category_rows":         100,
+    "streams_per_category":  100,
+    # Hotkeys
+    "key_quit":     "q",
+    "key_refresh":  "r",
+    "key_follow":   "f",
+    "key_search":   "/",
+    "key_settings": "s",
+    # System
+    "run_on_startup": False,
 }
+
+COLOR_CHOICES = ["magenta","cyan","green","yellow","red","blue","white",
+                 "bright_magenta","bright_cyan","bright_green","bright_blue",
+                 "bright_red","orange1","purple"]
+BG_CHOICES    = ["grey19","grey23","grey15","grey0","navy_blue","dark_red",
+                 "deep_pink4","grey35"]
 
 SETTINGS_SCHEMA = [
     ("General", [
@@ -37,7 +63,30 @@ SETTINGS_SCHEMA = [
         {"key": "hide_stream_console", "type": "bool",   "label": "Hide streamlink console", "help": "run streams without a console window"},
         {"key": "custom_flags",        "type": "text",   "label": "Custom flags",       "help": "extra streamlink args, space-separated"},
     ]),
-    # ("Chat", [...])
+    ("Appearance", [
+        {"key":"color_accent",      "type":"color","choices":COLOR_CHOICES,"label":"Accent",        "help":"panel borders + titles"},
+        {"key":"color_cursor",      "type":"color","choices":COLOR_CHOICES,"label":"Cursor",        "help":"selection cursor + caret"},
+        {"key":"color_live",        "type":"color","choices":COLOR_CHOICES,"label":"Live",          "help":"live dot + viewer counts"},
+        {"key":"color_tab",         "type":"color","choices":COLOR_CHOICES,"label":"Tab highlight", "help":"active tab background"},
+        {"key":"color_open",        "type":"color","choices":COLOR_CHOICES,"label":"Open marker",   "help":"▶ open + ★ followed"},
+        {"key":"color_highlight_bg","type":"color","choices":BG_CHOICES,   "label":"Selected row",  "help":"highlighted row background"},
+    ]),
+    ("Lists", [
+        {"key":"list_autorefresh_secs","type":"int","min":0,"max":600,"step":5,"unit":"s","label":"Auto-refresh","help":"re-check followed status every N sec (0 = off)"},
+        {"key":"search_results",       "type":"int","min":5,"max":30, "step":5,"label":"Search results", "help":"max channel search rows (twitch caps ~10-15)"},
+        {"key":"category_rows",        "type":"int","min":10,"max":100,"step":10,"label":"Category rows","help":"top games / category search rows"},
+        {"key":"streams_per_category", "type":"int","min":10,"max":100,"step":10,"label":"Streams per category","help":"channels loaded when opening a category"},
+    ]),
+    ("Hotkeys", [
+        {"key":"key_quit",    "type":"key","label":"Quit",     "help":"list-mode quit key"},
+        {"key":"key_refresh", "type":"key","label":"Refresh",  "help":"re-check followed channels"},
+        {"key":"key_follow",  "type":"key","label":"Follow",   "help":"follow/unfollow selected"},
+        {"key":"key_search",  "type":"key","label":"Search",   "help":"open channel search"},
+        {"key":"key_settings","type":"key","label":"Settings", "help":"open this screen"},
+    ]),
+    ("System", [
+        {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when Windows starts (Windows only)"},
+    ]),
 ]
 
 def build_stream_cmd(channel):
@@ -94,9 +143,13 @@ def load_config():
                     if f["key"] == k:
                         if f["type"] == "bool" and isinstance(val, bool):
                             SETTINGS[k] = val
-                        elif f["type"] == "choice" and val in f.get("choices", []):
+                        elif f["type"] in ("choice", "color") and val in f.get("choices", []):
                             SETTINGS[k] = val
                         elif f["type"] == "text" and isinstance(val, str):
+                            SETTINGS[k] = val
+                        elif f["type"] == "int" and isinstance(val, int) and not isinstance(val, bool):
+                            SETTINGS[k] = max(f["min"], min(f["max"], val))
+                        elif f["type"] == "key" and isinstance(val, str) and len(val) == 1:
                             SETTINGS[k] = val
                         break
 
