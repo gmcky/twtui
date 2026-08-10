@@ -132,7 +132,7 @@ def _channel_table(results, sel, opened, followed, failed=None):
         live_ = res["live"]
         cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
         dot = Text("●", style=f"bold {THEME['live']}") if live_ else Text("○", style="dim")
-        name_style = "bold white on grey19" if is_sel else ("white" if live_ else "dim")
+        name_style = f"bold white on {THEME['highlight_bg']}" if is_sel else ("white" if live_ else "dim")
         viewers = f"{res['viewers']:,}" if live_ else "—"
         # Star (followed) and open marker are independent; show both when both apply.
         watching = Text()
@@ -213,7 +213,7 @@ def render_cats(st):
         for i, g in enumerate(vis):
             is_sel = i == rsel
             cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
-            name_style = "bold white on grey19" if is_sel else "white"
+            name_style = f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
             table.add_row(
                 cursor,
                 Text(f" {g['display']} ", style=name_style),
