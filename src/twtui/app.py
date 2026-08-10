@@ -112,7 +112,7 @@ def main():
                         st["cat_searching"] = True
                     if st["mode"] == "cats":
                         paint_cats()
-                    res = search_games(q) if q.strip() else top_games()
+                    res = search_games(q, SETTINGS["category_rows"]) if q.strip() else top_games(SETTINGS["category_rows"])
                     with lock:
                         if gen != st["gen"]:
                             continue
@@ -132,7 +132,7 @@ def main():
                     st["searching"] = True
                 if st["mode"] == "search":
                     paint_search()
-                res = twitch_search(q)
+                res = twitch_search(q, SETTINGS["search_results"])
                 with lock:
                     if gen != st["gen"]:   # a newer query is pending; drop this
                         continue
@@ -154,6 +154,29 @@ def main():
 
         sync_th = threading.Thread(target=sync_worker, daemon=True)
         sync_th.start()
+
+        def autorefresh_worker():
+            while not st["stop"]:
+                secs = SETTINGS["list_autorefresh_secs"]
+                if secs <= 0:
+                    time.sleep(1)
+                    continue
+                for _ in range(int(secs * 10)):
+                    if st["stop"] or SETTINGS["list_autorefresh_secs"] != secs:
+                        break
+                    time.sleep(0.1)
+                if st["stop"]: break
+                if st["mode"] != "list": continue
+                new_status = get_status(channels)
+                with lock:
+                    status.clear()
+                    status.update(new_status)
+                    sort_channels(channels, status)
+                if st["mode"] == "list":
+                    paint_list()
+
+        ar_th = threading.Thread(target=autorefresh_worker, daemon=True)
+        ar_th.start()
 
         status = get_status(channels)
         sort_channels(channels, status)
@@ -374,7 +397,7 @@ def main():
                             st["cat_streams"], st["cat_searching"] = [], True
                             st["mode"] = "cat"
                             paint_cat()                   # loading spinner
-                            streams = game_streams(g["name"])
+                            streams = game_streams(g["name"], SETTINGS["streams_per_category"])
                             with lock:
                                 st["cat_streams"], st["cat_searching"], st["cat_ch_sel"] = streams, False, 0
                             paint_cat()
@@ -490,8 +513,11 @@ def main():
                     elif hot == "r":
                         live.auto_refresh = True
                         live.update(loading_panel(), refresh=True)
-                        status = get_status(channels)
-                        sort_channels(channels, status)
+                        new_status = get_status(channels)
+                        with lock:
+                            status.clear()
+                            status.update(new_status)
+                            sort_channels(channels, status)
                         selected = 0
                         live.auto_refresh = False
                         paint_list()
