@@ -4,21 +4,103 @@ import json
 import os
 import re
 import sys
+import shlex
+from twtui.keymap import KEYBINDS
 
 
 STREAMLINK = "streamlink"
-FLAGS = ["best", "--twitch-low-latency", "--hls-live-edge", "1"]
 
-# Runtime settings, editable in the settings view and persisted to config.json.
+QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
+
 SETTINGS = {
-    "hide_stream_console": False,   # run streamlink with no console window
-    "kill_streams_on_exit": False,  # terminate launched streams when client exits
+    # General
+    "kill_streams_on_exit": False,
+    "kill_orphans_on_start": False,
+    "kill_all_streams_on_start": False,
+    "confirm_before_quit": False,
+    # Streamlink
+    "quality": "best",
+    "low_latency": True,
+    "hide_stream_console": False,
+    "custom_flags": "",
+    # Appearance
+    "color_accent":       "magenta",
+    "color_cursor":       "cyan",
+    "color_live":         "green",
+    "color_tab":          "yellow",
+    "color_open":         "yellow",
+    "color_highlight_bg": "grey19",
+    # Lists
+    "list_autorefresh_secs": 0,
+    "search_results":        15,
+    "category_rows":         100,
+    "streams_per_category":  100,
+    # Hotkeys
+    "key_quit":     "q",
+    "key_refresh":  "r",
+    "key_follow":   "f",
+    "key_search":   "/",
+    "key_settings": "s",
+    # System
+    "run_on_startup": False,
 }
-# (key, label, help) in display order.
-SETTINGS_META = [
-    ("hide_stream_console", "Hide streamlink console", "run streams without a console window"),
-    ("kill_streams_on_exit", "Kill streams on exit", "close all open streams when you quit"),
+
+COLOR_CHOICES = ["magenta","cyan","green","yellow","red","blue","white",
+                 "bright_magenta","bright_cyan","bright_green","bright_blue",
+                 "bright_red","orange1","purple"]
+BG_CHOICES    = ["grey19","grey23","grey15","grey0","navy_blue","dark_red",
+                 "deep_pink4","grey35"]
+
+SETTINGS_SCHEMA = [
+    ("General", [
+        {"key": "kill_streams_on_exit",     "type": "bool",   "label": "Kill streams on exit",        "help": "close all open streams when you quit"},
+        {"key": "kill_orphans_on_start",    "type": "bool",   "label": "Kill ended streams on start", "help": "on launch, close players whose stream already ended"},
+        {"key": "kill_all_streams_on_start","type": "bool",   "label": "Kill all streams on start",   "help": "on launch, close every stream left from last session"},
+        {"key": "confirm_before_quit",      "type": "bool",   "label": "Confirm before quit",         "help": "ask before quitting if streams are open"},
+    ]),
+    ("Streamlink", [
+        {"key": "quality",             "type": "choice", "choices": QUALITY_CHOICES, "label": "Quality",            "help": "stream quality passed to streamlink"},
+        {"key": "low_latency",         "type": "bool",   "label": "Low latency",        "help": "--twitch-low-latency (nearer live edge)"},
+        {"key": "hide_stream_console", "type": "bool",   "label": "Hide streamlink console", "help": "run streams without a console window"},
+        {"key": "custom_flags",        "type": "text",   "label": "Custom flags",       "help": "extra streamlink args, space-separated"},
+    ]),
+    ("Appearance", [
+        {"key":"color_accent",      "type":"color","choices":COLOR_CHOICES,"label":"Accent",        "help":"panel borders + titles"},
+        {"key":"color_cursor",      "type":"color","choices":COLOR_CHOICES,"label":"Cursor",        "help":"selection cursor + caret"},
+        {"key":"color_live",        "type":"color","choices":COLOR_CHOICES,"label":"Live",          "help":"live dot + viewer counts"},
+        {"key":"color_tab",         "type":"color","choices":COLOR_CHOICES,"label":"Tab highlight", "help":"active tab background"},
+        {"key":"color_open",        "type":"color","choices":COLOR_CHOICES,"label":"Open marker",   "help":"▶ open + ★ followed"},
+        {"key":"color_highlight_bg","type":"color","choices":BG_CHOICES,   "label":"Selected row",  "help":"highlighted row background"},
+    ]),
+    ("Lists", [
+        {"key":"list_autorefresh_secs","type":"int","min":0,"max":600,"step":5,"unit":"s","label":"Auto-refresh","help":"re-check followed status every N sec (0 = off)"},
+        {"key":"search_results",       "type":"int","min":5,"max":30, "step":5,"label":"Search results", "help":"max channel search rows (twitch caps ~10-15)"},
+        {"key":"category_rows",        "type":"int","min":10,"max":100,"step":10,"label":"Category rows","help":"top games / category search rows"},
+        {"key":"streams_per_category", "type":"int","min":10,"max":100,"step":10,"label":"Streams per category","help":"channels loaded when opening a category"},
+    ]),
+    ("Hotkeys", [
+        {"key":"key_quit",    "type":"key","label":"Quit",     "help":"list-mode quit key"},
+        {"key":"key_refresh", "type":"key","label":"Refresh",  "help":"re-check followed channels"},
+        {"key":"key_follow",  "type":"key","label":"Follow",   "help":"follow/unfollow selected"},
+        {"key":"key_search",  "type":"key","label":"Search",   "help":"open channel search"},
+        {"key":"key_settings","type":"key","label":"Settings", "help":"open this screen"},
+    ]),
+    ("System", [
+        {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when Windows starts (Windows only)"},
+    ]),
 ]
+
+def build_stream_cmd(channel):
+    args = [STREAMLINK, f"twitch.tv/{channel}", SETTINGS["quality"]]
+    if SETTINGS["low_latency"]:
+        args += ["--twitch-low-latency", "--hls-live-edge", "1"]
+    extra = SETTINGS["custom_flags"].strip()
+    if extra:
+        try:
+            args += shlex.split(extra)
+        except ValueError:
+            pass
+    return args
 
 
 # App dir (frozen exe or source); used only to find a legacy channels.txt / *.bat.
@@ -48,7 +130,30 @@ CHANNELS_FILE = os.environ.get("TWITCH_TUI_CHANNELS") or os.path.join(_config_di
 CHANNELS_HEADER = "# One Twitch channel per line. Blank lines and #comments ignored.\n"
 
 CONFIG_FILE = os.path.join(_config_dir(), "config.json")
+STREAMS_FILE = os.path.join(_config_dir(), "open_streams.json")
 
+def build_theme():
+    return {
+        "accent":       SETTINGS["color_accent"],
+        "cursor":       SETTINGS["color_cursor"],
+        "live":         SETTINGS["color_live"],
+        "tab":          SETTINGS["color_tab"],
+        "open":         SETTINGS["color_open"],
+        "highlight_bg": SETTINGS["color_highlight_bg"],
+    }
+
+THEME = {}
+
+def rebuild_theme():
+    THEME.clear()
+    THEME.update(build_theme())
+
+def rebuild_keybinds():
+    KEYBINDS["q"] = SETTINGS["key_quit"]
+    KEYBINDS["r"] = SETTINGS["key_refresh"]
+    KEYBINDS["f"] = SETTINGS["key_follow"]
+    KEYBINDS["/"] = SETTINGS["key_search"]
+    KEYBINDS["s"] = SETTINGS["key_settings"]
 
 def load_config():
     try:
@@ -56,9 +161,25 @@ def load_config():
     except Exception:
         return
     for k in SETTINGS:
-        if isinstance(data.get(k), bool):
-            SETTINGS[k] = data[k]
-
+        if k in data:
+            val = data[k]
+            # Validate per type
+            for sec_name, fields in SETTINGS_SCHEMA:
+                for f in fields:
+                    if f["key"] == k:
+                        if f["type"] == "bool" and isinstance(val, bool):
+                            SETTINGS[k] = val
+                        elif f["type"] in ("choice", "color") and val in f.get("choices", []):
+                            SETTINGS[k] = val
+                        elif f["type"] == "text" and isinstance(val, str):
+                            SETTINGS[k] = val
+                        elif f["type"] == "int" and isinstance(val, int) and not isinstance(val, bool):
+                            SETTINGS[k] = max(f["min"], min(f["max"], val))
+                        elif f["type"] == "key" and isinstance(val, str) and len(val) == 1:
+                            SETTINGS[k] = val
+                        break
+    rebuild_theme()
+    rebuild_keybinds()
 
 def save_config():
     try:
@@ -66,6 +187,31 @@ def save_config():
             json.dump(SETTINGS, f, indent=2)
     except Exception:
         pass
+
+    if sys.platform == "win32":
+        try:
+            import winreg
+            key = winreg.OpenKey(
+                winreg.HKEY_CURRENT_USER,
+                r"Software\Microsoft\Windows\CurrentVersion\Run",
+                0,
+                winreg.KEY_SET_VALUE
+            )
+            app_name = "TwitchTUI"
+            if SETTINGS.get("run_on_startup"):
+                if getattr(sys, "frozen", False):
+                    cmd = f'"{sys.executable}"'
+                else:
+                    cmd = f'"{sys.executable}" -m twtui.app'
+                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
+            else:
+                try:
+                    winreg.DeleteValue(key, app_name)
+                except FileNotFoundError:
+                    pass
+            winreg.CloseKey(key)
+        except Exception:
+            pass
 
 
 def _read_channels(path):
@@ -104,3 +250,6 @@ def save_channels(channels):
         f.write(CHANNELS_HEADER)
         for c in channels:
             f.write(c + "\n")
+
+rebuild_theme()
+rebuild_keybinds()

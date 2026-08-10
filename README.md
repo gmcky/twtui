@@ -42,9 +42,13 @@ API key.
 - Fuzzy search across all of Twitch (matches logins and display names, any language).
 - Browse top categories and the top channels within one.
 - Follow / unfollow from anywhere; the list is saved per user.
-- Open a stream in your player with one key.
-- Hotkeys work on any keyboard layout.
-- Small settings screen (background streamlink, kill-on-exit), saved to config.
+- Open a stream in your player with one key; a launch that dies right away is
+  flagged `✗ failed` instead of pretending to be open.
+- Settings screen (saved to config.json): stream quality, low-latency, custom
+  streamlink flags, theme colors, rebindable hotkeys, list auto-refresh, result
+  counts, kill-on-exit, confirm-before-quit, startup cleanup of orphaned streams,
+  and (Windows) run-on-startup.
+- Hotkeys work on any keyboard layout and can be rebound.
 
 ## Install
 
@@ -60,8 +64,8 @@ twtui
 Or run it straight from a clone:
 
 ```bash
-pip install rich requests
-python watch.py
+pip install rich requests psutil
+python -m twtui.app
 ```
 
 ## Usage
@@ -82,18 +86,21 @@ python watch.py
 | `Tab` | Switch followed list ⇄ search |
 | `←` `→` | Switch Streamers / Categories (in search) |
 | `Ctrl+F` | Follow / unfollow (in search or a category) |
-| `Ctrl+G` | Open categories |
 | `f` | Unfollow (in the followed list) |
 | `r` | Refresh live status |
 | `s` | Settings |
 | `Ctrl+Q` | Quit (from anywhere) |
 | `Esc` | Back / quit |
 
+The single-key list hotkeys (`f` `r` `s` `q` and search `/`) are rebindable in the
+settings screen.
+
 ## Notes
 
 - Unofficial. It uses Twitch's public web GraphQL, not the official API, so it can
   break if Twitch changes things. Search returns ~10 results and lists load one
-  page (~100); deeper paging needs a signed token and is not implemented.
+  page (row counts are configurable in settings, but Twitch caps search server
+  side); deeper cursor paging needs a signed token and is not implemented.
 - Not affiliated with Twitch.
 
 ## License
