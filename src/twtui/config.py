@@ -128,6 +128,21 @@ CHANNELS_HEADER = "# One Twitch channel per line. Blank lines and #comments igno
 CONFIG_FILE = os.path.join(_config_dir(), "config.json")
 STREAMS_FILE = os.path.join(_config_dir(), "open_streams.json")
 
+def build_theme():
+    return {
+        "accent":       SETTINGS["color_accent"],
+        "cursor":       SETTINGS["color_cursor"],
+        "live":         SETTINGS["color_live"],
+        "tab":          SETTINGS["color_tab"],
+        "open":         SETTINGS["color_open"],
+        "highlight_bg": SETTINGS["color_highlight_bg"],
+    }
+
+THEME = {}
+
+def rebuild_theme():
+    THEME.clear()
+    THEME.update(build_theme())
 
 def load_config():
     try:
@@ -152,7 +167,7 @@ def load_config():
                         elif f["type"] == "key" and isinstance(val, str) and len(val) == 1:
                             SETTINGS[k] = val
                         break
-
+    rebuild_theme()
 
 def save_config():
     try:
@@ -198,3 +213,5 @@ def save_channels(channels):
         f.write(CHANNELS_HEADER)
         for c in channels:
             f.write(c + "\n")
+
+rebuild_theme()

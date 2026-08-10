@@ -7,17 +7,17 @@ from rich.text import Text
 from rich.panel import Panel
 
 from twtui.api import OFFLINE
-from twtui.config import SETTINGS, SETTINGS_SCHEMA
+from twtui.config import SETTINGS, SETTINGS_SCHEMA, THEME
 
 console = Console()
 
 
 def loading_panel(msg="checking channels"):
-    spinner = Spinner("dots", text=Text(f" {msg} …", style="cyan"), style="magenta")
+    spinner = Spinner("dots", text=Text(f" {msg} …", style="cyan"), style=THEME["accent"])
     return Panel(
         Align.center(spinner, vertical="middle"),
-        title="[bold magenta]twitch — followed channels[/]",
-        border_style="magenta",
+        title="[bold {THEME['accent']}]twitch — followed channels[/]",
+        border_style=THEME["accent"],
         padding=(2, 4),
     )
 
@@ -44,9 +44,9 @@ def render(channels, status, selected, checking, opened):
         else:
             dot, tag, tag_style = "○", "off", "dim"
 
-        cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
+        cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
         name_style = "bold white on grey19" if is_sel else "white"
-        watching = Text("▶ open", style="bold yellow") if ch in opened else Text("")
+        watching = Text("▶ open", style=f"bold {THEME['open']}") if ch in opened else Text("")
         viewers = f"{meta['viewers']:,}" if (not checking and live) else ""
         game = meta["game"] if (not checking and live) else ""
         name = Text(f" {ch} ", style=name_style)
@@ -55,10 +55,10 @@ def render(channels, status, selected, checking, opened):
             name.append(f"({disp}) ", style="dim")
         table.add_row(
             cursor,
-            Text(dot, style="green" if (not checking and live) else "dim"),
+            Text(dot, style=THEME["live"] if (not checking and live) else "dim"),
             Text(tag, style=tag_style),
             name,
-            Text(viewers, style="green" if live else "dim"),
+            Text(viewers, style=THEME["live"] if live else "dim"),
             Text(game, style="cyan" if live else "dim"),
             watching,
         )
@@ -71,7 +71,7 @@ def render(channels, status, selected, checking, opened):
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
         subtitle="[dim]↑↓ move · enter watch · f unfollow · r refresh · tab search · ctrl+g games · s settings · q quit[/]",
-        border_style="magenta",
+        border_style=THEME["accent"],
         padding=(1, 2),
     )
     return body
@@ -101,14 +101,14 @@ def _window(items, sel, max_rows):
 def _scroll_title(base, start, end, n):
     # Panel title with a scroll indicator when the list overflows the window.
     if n > end - start:
-        return f"[bold magenta]{base}[/] [dim]{start + 1}-{end}/{n}[/]"
-    return f"[bold magenta]{base}[/]"
+        return f"[bold {THEME['accent']}]{base}[/] [dim]{start + 1}-{end}/{n}[/]"
+    return f"[bold {THEME['accent']}]{base}[/]"
 
 
 def _tabs(active):
     # Streamers / Categories switcher header; active tab highlighted, both legible.
     def seg(label, key):
-        return f"[black on yellow] {label} [/]" if active == key else f"[yellow] {label} [/]"
+        return f"[black on {THEME['tab']}] {label} [/]" if active == key else f"[{THEME['tab']}] {label} [/]"
     return Align.center(Text.from_markup(seg("Streamers", "search") + "   " + seg("Categories", "cats")))
 
 
@@ -124,23 +124,23 @@ def _channel_table(results, sel, opened, followed):
     for i, res in enumerate(results):
         is_sel = i == sel
         live_ = res["live"]
-        cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
-        dot = Text("●", style="bold green") if live_ else Text("○", style="dim")
+        cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
+        dot = Text("●", style=f"bold {THEME['live']}") if live_ else Text("○", style="dim")
         name_style = "bold white on grey19" if is_sel else ("white" if live_ else "dim")
         viewers = f"{res['viewers']:,}" if live_ else "—"
         # Star (followed) and open marker are independent; show both when both apply.
         watching = Text()
         if res["login"].lower() in followed:
-            watching.append("★ ", style="yellow")
+            watching.append("★ ", style=THEME["open"])
         if res["login"] in opened:
-            watching.append("▶ open", style="bold yellow")
+            watching.append("▶ open", style=f"bold {THEME['open']}")
         # login + dim display name when they differ.
         name = Text(f" {res['login']} ", style=name_style)
         if res["display"] and res["display"].lower() != res["login"].lower():
             name.append(f"({res['display']}) ", style="dim")
         table.add_row(
             cursor, dot, name,
-            Text(viewers, style="green" if live_ else "dim"),
+            Text(viewers, style=THEME["live"] if live_ else "dim"),
             Text(res["game"], style="cyan" if live_ else "dim"),
             watching,
         )
@@ -149,20 +149,20 @@ def _channel_table(results, sel, opened, followed):
 
 def render_search(st, opened, followed):
     q = st["query"]
-    query_text = Text.assemble(("❱ ", "bold cyan"), (q, "white"), ("▉", "cyan"))
+    query_text = Text.assemble(("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"]))
     search_panel = Panel(
         query_text,
-        title="[bold magenta]search twitch[/]",
+        title="[bold {THEME['accent']}]search twitch[/]",
         subtitle="[dim]type · ←/→ switch · ↑↓ move · enter watch · ctrl+f follow · esc list · ctrl+q quit[/]",
-        border_style="cyan",
+        border_style=THEME["accent"],
         padding=(0, 1),
     )
 
     results = st["results"]
-    title = "[bold magenta]streamers[/]"
+    title = "[bold {THEME['accent']}]streamers[/]"
     if st["searching"] and not results:
         inner = Align.center(
-            Spinner("dots", text=Text(" searching …", style="cyan"), style="magenta"),
+            Spinner("dots", text=Text(" searching …", style="cyan"), style=THEME["accent"]),
             vertical="middle",
         )
     elif not results:
@@ -173,25 +173,25 @@ def render_search(st, opened, followed):
         inner = _channel_table(vis, rsel, opened, followed)
         title = _scroll_title("streamers", start, end, len(results))
 
-    results_panel = Panel(inner, title=title, border_style="magenta", padding=(1, 2))
+    results_panel = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
     return Group(_tabs("search"), search_panel, results_panel)
 
 
 def render_cats(st):
     q = st["cat_query"]
-    query_text = Text.assemble(("❱ ", "bold cyan"), (q, "white"), ("▉", "cyan"))
+    query_text = Text.assemble(("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"]))
     search_panel = Panel(
         query_text,
-        title="[bold magenta]search categories[/]",
+        title="[bold {THEME['accent']}]search categories[/]",
         subtitle="[dim]type · ←/→ switch · ↑↓ move · enter open · esc back · ctrl+q quit[/]",
-        border_style="cyan",
+        border_style=THEME["accent"],
         padding=(0, 1),
     )
     results = st["cat_results"]
-    title = "[bold magenta]categories[/]"
+    title = "[bold {THEME['accent']}]categories[/]"
     if st["cat_searching"] and not results:
         inner = Align.center(
-            Spinner("dots", text=Text(" loading …", style="cyan"), style="magenta"),
+            Spinner("dots", text=Text(" loading …", style="cyan"), style=THEME["accent"]),
             vertical="middle",
         )
     elif not results:
@@ -204,34 +204,34 @@ def render_cats(st):
         table.add_column("Viewers", justify="right", width=12, no_wrap=True)
         for i, g in enumerate(vis):
             is_sel = i == rsel
-            cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
+            cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
             name_style = "bold white on grey19" if is_sel else "white"
             table.add_row(
                 cursor,
                 Text(f" {g['display']} ", style=name_style),
-                Text(f"{g['viewers']:,}", style="green"),
+                Text(f"{g['viewers']:,}", style=THEME["live"]),
             )
         inner = table
         title = _scroll_title("categories", start, end, len(results))
-    body = Panel(inner, title=title, border_style="magenta", padding=(1, 2))
+    body = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
     return Group(_tabs("cats"), search_panel, body)
 
 
 def render_cat(st, opened, followed):
     q = st["cat_ch_query"]
     filtered = _filter_streams(st["cat_streams"], q)
-    query_text = Text.assemble(("❱ ", "bold cyan"), (q, "white"), ("▉", "cyan"))
+    query_text = Text.assemble(("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"]))
     search_panel = Panel(
         query_text,
-        title=f"[bold magenta]{st['game_display']} — top channels[/]",
+        title=f"[bold {THEME['accent']}]{st['game_display']} — top channels[/]",
         subtitle="[dim]filter · ↑↓ move · enter watch · ctrl+f follow · esc categories · ctrl+q quit[/]",
-        border_style="cyan",
+        border_style=THEME["accent"],
         padding=(0, 1),
     )
-    title = "[bold magenta]channels[/]"
+    title = "[bold {THEME['accent']}]channels[/]"
     if st["cat_searching"] and not st["cat_streams"]:
         inner = Align.center(
-            Spinner("dots", text=Text(" loading …", style="cyan"), style="magenta"),
+            Spinner("dots", text=Text(" loading …", style="cyan"), style=THEME["accent"]),
             vertical="middle",
         )
     elif not filtered:
@@ -241,7 +241,7 @@ def render_cat(st, opened, followed):
         vis, rsel, start, end = _window(filtered, st["cat_ch_sel"], _max_rows(8))
         inner = _channel_table(vis, rsel, opened, followed)
         title = _scroll_title("channels", start, end, len(filtered))
-    body = Panel(inner, title=title, border_style="magenta", padding=(1, 2))
+    body = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
     return Group(search_panel, body)
 
 
@@ -249,9 +249,9 @@ def _setting_tabs(active_idx):
     segs = []
     for i, (name, _) in enumerate(SETTINGS_SCHEMA):
         if i == active_idx:
-            segs.append(f"[black on yellow] {name} [/]")
+            segs.append(f"[black on {THEME['tab']}] {name} [/]")
         else:
-            segs.append(f"[yellow] {name} [/]")
+            segs.append(f"[{THEME['tab']}] {name} [/]")
     return Align.center(Text.from_markup("   ".join(segs)))
 
 def render_settings(st):
@@ -268,11 +268,11 @@ def render_settings(st):
         key = f["key"]
         val = SETTINGS.get(key, "")
         
-        cursor = Text("❱", style="bold cyan") if is_sel else Text(" ")
+        cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
         
         val_col = Text()
         if f["type"] == "bool":
-            val_col.append("[on]" if val else "[off]", style="bold green" if val else "dim")
+            val_col.append("[on]" if val else "[off]", style=f"bold {THEME['live']}" if val else "dim")
         elif f["type"] == "choice":
             val_col.append("‹ ", style="dim")
             val_col.append(str(val), style="white")
@@ -280,7 +280,7 @@ def render_settings(st):
         elif f["type"] == "text":
             if is_sel and st.get("set_editing"):
                 val_col.append(st["set_buf"], style="white")
-                val_col.append("▉", style="cyan")
+                val_col.append("▉", style=THEME["cursor"])
             else:
                 if val:
                     val_col.append(str(val), style="white")
@@ -289,7 +289,7 @@ def render_settings(st):
         elif f["type"] == "int":
             if is_sel and st.get("set_editing"):
                 val_col.append(st["set_buf"], style="white")
-                val_col.append("▉", style="cyan")
+                val_col.append("▉", style=THEME["cursor"])
             else:
                 val_col.append(f"{val}{f.get('unit', '')}", style="white")
         elif f["type"] == "color":
@@ -300,20 +300,20 @@ def render_settings(st):
             val_col.append(" ›", style="dim")
         elif f["type"] == "key":
             if is_sel and st.get("set_capturing"):
-                val_col.append("press a key…", style="cyan")
+                val_col.append("press a key…", style=THEME["cursor"])
             else:
                 val_col.append(str(val), style="white")
                     
-        name = Text(f" {f['label']} ", style="bold white on grey19" if is_sel else "white")
+        name = Text(f" {f['label']} ", style=f"bold white on {THEME['highlight_bg']}" if is_sel else "white")
         name.append(f"  {f['help']}", style="dim")
         
         table.add_row(cursor, val_col, name)
         
     body = Panel(
         table,
-        title="[bold magenta]settings[/]",
+        title="[bold {THEME['accent']}]settings[/]",
         subtitle="[dim]↑↓ move · ←→ section · enter toggle/edit · esc back · ctrl+q quit[/]",
-        border_style="magenta",
+        border_style=THEME["accent"],
         padding=(1, 2),
     )
     return Group(_setting_tabs(sec_idx), body)
@@ -324,7 +324,7 @@ def render_confirm(open_count):
     return Align.center(
         Panel(
             Text(msg, justify="center"),
-            border_style="yellow",
+            border_style=THEME["open"],
             padding=(1, 4)
         ),
         vertical="middle"
