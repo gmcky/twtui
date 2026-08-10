@@ -11,6 +11,7 @@ from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL, FOL
 from twtui.config import (
     SETTINGS, SETTINGS_SCHEMA,
     load_config, save_config, load_channels, save_channels, rebuild_theme,
+    rebuild_keybinds,
 )
 from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
@@ -267,6 +268,7 @@ def main():
                         SETTINGS[key] = norm_char
                         save_config()
                         rebuild_theme()
+                        rebuild_keybinds()
                         st["set_capturing"] = False
                         paint_settings()
                         continue
@@ -286,6 +288,7 @@ def main():
                                 SETTINGS[key] = st["set_buf"]
                             save_config()
                             rebuild_theme()
+                            rebuild_keybinds()
                             st["set_editing"] = False
                             paint_settings()
                         elif tok == "ESC":
@@ -322,6 +325,7 @@ def main():
                             SETTINGS[key] = not SETTINGS[key]
                             save_config()
                             rebuild_theme()
+                            rebuild_keybinds()
                             paint_settings()
                         elif f["type"] in ("choice", "color"):
                             opts = f["choices"]
@@ -329,6 +333,7 @@ def main():
                             SETTINGS[key] = opts[(idx + 1) % len(opts)]
                             save_config()
                             rebuild_theme()
+                            rebuild_keybinds()
                             paint_settings()
                         elif f["type"] == "text":
                             st["set_editing"] = True

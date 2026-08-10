@@ -5,6 +5,7 @@ import os
 import re
 import sys
 import shlex
+from twtui.keymap import KEYBINDS
 
 
 STREAMLINK = "streamlink"
@@ -144,6 +145,13 @@ def rebuild_theme():
     THEME.clear()
     THEME.update(build_theme())
 
+def rebuild_keybinds():
+    KEYBINDS["q"] = SETTINGS["key_quit"]
+    KEYBINDS["r"] = SETTINGS["key_refresh"]
+    KEYBINDS["f"] = SETTINGS["key_follow"]
+    KEYBINDS["/"] = SETTINGS["key_search"]
+    KEYBINDS["s"] = SETTINGS["key_settings"]
+
 def load_config():
     try:
         data = json.load(open(CONFIG_FILE, encoding="utf-8"))
@@ -168,6 +176,7 @@ def load_config():
                             SETTINGS[k] = val
                         break
     rebuild_theme()
+    rebuild_keybinds()
 
 def save_config():
     try:
@@ -215,3 +224,4 @@ def save_channels(channels):
             f.write(c + "\n")
 
 rebuild_theme()
+rebuild_keybinds()

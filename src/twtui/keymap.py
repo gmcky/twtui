@@ -1,7 +1,7 @@
 """Key mapping tables: hotkeys, layout folding, token normalisation."""
 
 # List-mode single-key hotkeys.
-HOTKEYS = ("q", "r", "f", "/", "s")
+KEYBINDS = {"q": "q", "r": "r", "f": "f", "/": "/", "s": "s"}
 
 # Cyrillic keys at the QWERTY positions -> latin hotkey (RU/UA layouts). Latin
 # layouts already match by character, so only Cyrillic needs folding.
