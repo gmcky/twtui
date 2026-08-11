@@ -313,6 +313,35 @@ def load_config():
     rebuild_theme()
     rebuild_keybinds()
 
+def set_run_on_startup(enabled):
+    """Add or remove the HKCU Run entry (Windows only). No-op elsewhere."""
+    if sys.platform != "win32":
+        return
+    try:
+        import winreg
+        key = winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\CurrentVersion\Run",
+            0,
+            winreg.KEY_SET_VALUE,
+        )
+        app_name = "TwitchTUI"
+        if enabled:
+            if getattr(sys, "frozen", False):
+                cmd = f'"{sys.executable}"'
+            else:
+                cmd = f'"{sys.executable}" -m twtui.app'
+            winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
+        else:
+            try:
+                winreg.DeleteValue(key, app_name)
+            except FileNotFoundError:
+                pass
+        winreg.CloseKey(key)
+    except Exception:
+        pass
+
+
 def save_config():
     SETTINGS["preset"] = detect_preset()
     try:
@@ -320,32 +349,6 @@ def save_config():
             json.dump(SETTINGS, f, indent=2)
     except Exception:
         pass
-
-    if sys.platform == "win32":
-        try:
-            import winreg
-            key = winreg.OpenKey(
-                winreg.HKEY_CURRENT_USER,
-                r"Software\Microsoft\Windows\CurrentVersion\Run",
-                0,
-                winreg.KEY_SET_VALUE
-            )
-            app_name = "TwitchTUI"
-            if SETTINGS.get("run_on_startup"):
-                if getattr(sys, "frozen", False):
-                    cmd = f'"{sys.executable}"'
-                else:
-                    cmd = f'"{sys.executable}" -m twtui.app'
-                winreg.SetValueEx(key, app_name, 0, winreg.REG_SZ, cmd)
-            else:
-                try:
-                    winreg.DeleteValue(key, app_name)
-                except FileNotFoundError:
-                    pass
-            winreg.CloseKey(key)
-        except Exception:
-            pass
-
 
 def _read_channels(path):
     chans = []
