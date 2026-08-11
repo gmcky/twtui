@@ -190,16 +190,38 @@ SETTINGS_SCHEMA = [
     ]),
 ]
 
-def build_stream_cmd(channel):
+def vod_target(query):
+    """Return 'videos/<id>' if the query is a Twitch VOD reference, else None.
+    Accepts a full URL, 'videos/123', or a bare numeric id."""
+    q = query.strip()
+    m = re.search(r"videos/(\d+)", q)
+    if m:
+        return f"videos/{m.group(1)}"
+    if q.isdigit():
+        return f"videos/{q}"
+    return None
+
+
+def build_stream_cmd(target):
+    """target = a channel login, or a VOD ("videos/<id>" or a full twitch URL)."""
     s = SETTINGS
-    args = [STREAMLINK, f"twitch.tv/{channel}", s["quality"]]
+    if target.startswith("http"):
+        url = target
+    elif target.startswith("twitch.tv/"):
+        url = target
+    else:
+        url = f"twitch.tv/{target}"
+    is_vod = "videos/" in url
+
+    args = [STREAMLINK, url, s["quality"]]
 
     # Latency: low_latency manages its own live edge; only pass a manual
     # --hls-live-edge when low_latency is OFF.
-    if s["low_latency"]:
-        args += ["--twitch-low-latency"]
-    else:
-        args += ["--hls-live-edge", str(s["hls_live_edge"])]
+    if not is_vod:
+        if s["low_latency"]:
+            args += ["--twitch-low-latency"]
+        else:
+            args += ["--hls-live-edge", str(s["hls_live_edge"])]
 
     # Codecs (only if not the plain default, to keep the cmd clean).
     if s["twitch_codecs"] and s["twitch_codecs"] != "h264":
@@ -212,13 +234,14 @@ def build_stream_cmd(channel):
         args += ["--player-args", s["player_args"].strip()]
 
     # Reliability. Each 0/default value means "omit the flag".
-    if s["retry_streams"] > 0:
-        args += ["--retry-streams", str(s["retry_streams"])]
-        # retry_max only meaningful while retrying; 0 -> unlimited (omit flag).
-        if s["retry_max"] > 0:
-            args += ["--retry-max", str(s["retry_max"])]
-    if s["retry_open"] != 1:
-        args += ["--retry-open", str(s["retry_open"])]
+    if not is_vod:
+        if s["retry_streams"] > 0:
+            args += ["--retry-streams", str(s["retry_streams"])]
+            # retry_max only meaningful while retrying; 0 -> unlimited (omit flag).
+            if s["retry_max"] > 0:
+                args += ["--retry-max", str(s["retry_max"])]
+        if s["retry_open"] != 1:
+            args += ["--retry-open", str(s["retry_open"])]
     if s["stream_timeout"] != 60:
         args += ["--stream-timeout", str(s["stream_timeout"])]
     if s["ringbuffer_size"] != "16M":
@@ -234,13 +257,14 @@ def build_stream_cmd(channel):
     elif s["ip_version"] == "ipv6":
         args += ["--ipv6"]
 
-    if s["dvr_restart"]:
+    if not is_vod and s["dvr_restart"]:
         args += ["--hls-live-restart"]
     if s["record_streams"] and s["record_dir"].strip():
         import os, time as _t
         try:
             os.makedirs(s["record_dir"].strip(), exist_ok=True)
-            fname = f"{channel}-{_t.strftime('%Y%m%d-%H%M%S')}.ts"
+            safe = target.replace("/", "-")
+            fname = f"{safe}-{_t.strftime('%Y%m%d-%H%M%S')}.ts"
             path = os.path.join(s["record_dir"].strip(), fname)
             args += ["--record", path]   # --record plays live AND saves
         except Exception:

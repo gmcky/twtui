@@ -11,7 +11,7 @@ from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL, FOL
 from twtui.config import (
     SETTINGS, SETTINGS_SCHEMA,
     load_config, save_config, set_run_on_startup, load_channels, save_channels,
-    rebuild_theme, rebuild_keybinds, apply_preset,
+    rebuild_theme, rebuild_keybinds, apply_preset, vod_target,
 )
 from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
@@ -509,10 +509,14 @@ def main():
 
                 if mode == "search":
                     if tok == "ENTER":
-                        with lock:
-                            res = st["results"][st["sel"]] if st["results"] else None
-                        if res:
-                            do_launch(res["login"], paint_search)
+                        vt = vod_target(st["query"])
+                        if vt:
+                            do_launch(vt, paint_search)
+                        else:
+                            with lock:
+                                res = st["results"][st["sel"]] if st["results"] else None
+                            if res:
+                                do_launch(res["login"], paint_search)
                     elif tok == "CTRL_F":
                         with lock:
                             res = st["results"][st["sel"]] if st["results"] else None
