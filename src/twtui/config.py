@@ -18,11 +18,24 @@ SETTINGS = {
     "kill_orphans_on_start": False,
     "kill_all_streams_on_start": False,
     "confirm_before_quit": False,
-    # Streamlink
+    # Streamlink (playback)
     "quality": "best",
     "low_latency": True,
     "hide_stream_console": False,
     "custom_flags": "",
+    "twitch_codecs":   "h264",     # --twitch-supported-codecs
+    "hls_live_edge":   3,          # --hls-live-edge (used only when low_latency off)
+    "player_path":     "",         # --player PATH (empty = streamlink default)
+    "player_args":     "",         # --player-args
+    # Network (reliability / advanced)
+    "retry_streams":   0,          # --retry-streams SECS (0 = off; wait for live)
+    "retry_max":       0,          # --retry-max N (0 = unlimited when retrying)
+    "retry_open":      1,          # --retry-open N
+    "stream_timeout":  60,         # --stream-timeout SECS
+    "ringbuffer_size": "16M",      # --ringbuffer-size
+    "segment_threads": 1,          # --stream-segment-threads
+    "http_proxy":      "",         # --http-proxy URL
+    "ip_version":      "auto",     # auto | ipv4 | ipv6  -> --ipv4 / --ipv6
     # Appearance
     "color_accent":       "magenta",
     "color_cursor":       "cyan",
@@ -51,6 +64,10 @@ COLOR_CHOICES = ["magenta","cyan","green","yellow","red","blue","white",
 BG_CHOICES    = ["grey19","grey23","grey15","grey0","navy_blue","dark_red",
                  "deep_pink4","grey35"]
 
+CODEC_CHOICES      = ["h264", "av1,h264", "h265,h264", "av1,h265,h264"]
+RINGBUFFER_CHOICES = ["16M", "32M", "64M", "128M"]
+IPVER_CHOICES      = ["auto", "ipv4", "ipv6"]
+
 SETTINGS_SCHEMA = [
     ("General", [
         {"key": "kill_streams_on_exit",     "type": "bool",   "label": "Kill streams on exit",        "help": "close all open streams when you quit"},
@@ -59,10 +76,24 @@ SETTINGS_SCHEMA = [
         {"key": "confirm_before_quit",      "type": "bool",   "label": "Confirm before quit",         "help": "ask before quitting if streams are open"},
     ]),
     ("Streamlink", [
-        {"key": "quality",             "type": "choice", "choices": QUALITY_CHOICES, "label": "Quality",            "help": "stream quality passed to streamlink"},
-        {"key": "low_latency",         "type": "bool",   "label": "Low latency",        "help": "--twitch-low-latency (nearer live edge)"},
-        {"key": "hide_stream_console", "type": "bool",   "label": "Hide streamlink console", "help": "run streams without a console window"},
-        {"key": "custom_flags",        "type": "text",   "label": "Custom flags",       "help": "extra streamlink args, space-separated"},
+        {"key":"quality",       "type":"choice","choices":QUALITY_CHOICES,"label":"Quality",       "help":"stream quality passed to streamlink"},
+        {"key":"low_latency",   "type":"bool",  "label":"Low latency",    "help":"--twitch-low-latency (nearer live edge, manages edge itself)"},
+        {"key":"twitch_codecs", "type":"choice","choices":CODEC_CHOICES,  "label":"Codecs",         "help":"--twitch-supported-codecs preference order"},
+        {"key":"hls_live_edge", "type":"int","min":1,"max":6,"step":1,     "label":"Live edge",      "help":"segments behind live (ignored when low latency on)"},
+        {"key":"player_path",   "type":"text",  "label":"Player path",    "help":"custom player exe (blank = streamlink default)"},
+        {"key":"player_args",   "type":"text",  "label":"Player args",    "help":"extra args passed to the player"},
+        {"key":"hide_stream_console","type":"bool","label":"Hide streamlink console","help":"run streams without a console window"},
+        {"key":"custom_flags",  "type":"text",  "label":"Custom flags",   "help":"extra streamlink args, space-separated"},
+    ]),
+    ("Network", [
+        {"key":"retry_streams",   "type":"int","min":0,"max":60, "step":1,"unit":"s","label":"Retry streams", "help":"wait+retry until channel is live (0 = off)"},
+        {"key":"retry_max",       "type":"int","min":0,"max":20, "step":1,          "label":"Retry max",      "help":"max stream-fetch retries (0 = unlimited while retrying)"},
+        {"key":"retry_open",      "type":"int","min":1,"max":10, "step":1,          "label":"Retry open",     "help":"attempts to open the stream"},
+        {"key":"stream_timeout",  "type":"int","min":30,"max":300,"step":10,"unit":"s","label":"Stream timeout","help":"inactivity timeout before giving up"},
+        {"key":"ringbuffer_size", "type":"choice","choices":RINGBUFFER_CHOICES,     "label":"Buffer size",    "help":"--ringbuffer-size (bigger = smoother, more RAM)"},
+        {"key":"segment_threads", "type":"int","min":1,"max":10, "step":1,          "label":"Segment threads","help":"parallel segment downloads (faster on fast links)"},
+        {"key":"http_proxy",      "type":"text","label":"HTTP proxy", "help":"--http-proxy URL (blank = none)"},
+        {"key":"ip_version",      "type":"choice","choices":IPVER_CHOICES,          "label":"IP version",     "help":"force IPv4/IPv6 or auto"},
     ]),
     ("Appearance", [
         {"key":"color_accent",      "type":"color","choices":COLOR_CHOICES,"label":"Accent",        "help":"panel borders + titles"},
@@ -91,10 +122,51 @@ SETTINGS_SCHEMA = [
 ]
 
 def build_stream_cmd(channel):
-    args = [STREAMLINK, f"twitch.tv/{channel}", SETTINGS["quality"]]
-    if SETTINGS["low_latency"]:
-        args += ["--twitch-low-latency", "--hls-live-edge", "1"]
-    extra = SETTINGS["custom_flags"].strip()
+    s = SETTINGS
+    args = [STREAMLINK, f"twitch.tv/{channel}", s["quality"]]
+
+    # Latency: low_latency manages its own live edge; only pass a manual
+    # --hls-live-edge when low_latency is OFF.
+    if s["low_latency"]:
+        args += ["--twitch-low-latency"]
+    else:
+        args += ["--hls-live-edge", str(s["hls_live_edge"])]
+
+    # Codecs (only if not the plain default, to keep the cmd clean).
+    if s["twitch_codecs"] and s["twitch_codecs"] != "h264":
+        args += ["--twitch-supported-codecs", s["twitch_codecs"]]
+
+    # Player.
+    if s["player_path"].strip():
+        args += ["--player", s["player_path"].strip()]
+    if s["player_args"].strip():
+        args += ["--player-args", s["player_args"].strip()]
+
+    # Reliability. Each 0/default value means "omit the flag".
+    if s["retry_streams"] > 0:
+        args += ["--retry-streams", str(s["retry_streams"])]
+        # retry_max only meaningful while retrying; 0 -> unlimited (omit flag).
+        if s["retry_max"] > 0:
+            args += ["--retry-max", str(s["retry_max"])]
+    if s["retry_open"] != 1:
+        args += ["--retry-open", str(s["retry_open"])]
+    if s["stream_timeout"] != 60:
+        args += ["--stream-timeout", str(s["stream_timeout"])]
+    if s["ringbuffer_size"] != "16M":
+        args += ["--ringbuffer-size", s["ringbuffer_size"]]
+    if s["segment_threads"] > 1:
+        args += ["--stream-segment-threads", str(s["segment_threads"])]
+
+    # Network.
+    if s["http_proxy"].strip():
+        args += ["--http-proxy", s["http_proxy"].strip()]
+    if s["ip_version"] == "ipv4":
+        args += ["--ipv4"]
+    elif s["ip_version"] == "ipv6":
+        args += ["--ipv6"]
+
+    # Custom flags LAST so a power user can override anything above.
+    extra = s["custom_flags"].strip()
     if extra:
         try:
             args += shlex.split(extra)
