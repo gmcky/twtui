@@ -11,7 +11,7 @@ from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL, FOL
 from twtui.config import (
     SETTINGS, SETTINGS_SCHEMA,
     load_config, save_config, load_channels, save_channels, rebuild_theme,
-    rebuild_keybinds,
+    rebuild_keybinds, apply_preset,
 )
 from twtui.ui import (
     console, loading_panel, render, render_search, render_cats, render_cat,
@@ -292,7 +292,10 @@ def main():
                             st["pick_sel"] = (st["pick_sel"] + 1) % len(opts)
                             paint_settings()
                         elif tok == "ENTER":
-                            SETTINGS[f["key"]] = opts[st["pick_sel"]]
+                            if f["type"] == "preset":
+                                apply_preset(opts[st["pick_sel"]])
+                            else:
+                                SETTINGS[f["key"]] = opts[st["pick_sel"]]
                             save_config()
                             rebuild_theme()
                             rebuild_keybinds()
@@ -379,7 +382,7 @@ def main():
                             rebuild_theme()
                             rebuild_keybinds()
                             paint_settings()
-                        elif f["type"] in ("choice", "color"):
+                        elif f["type"] in ("choice", "color", "preset"):
                             opts = f["choices"]
                             st["pick_sel"] = opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
                             st["set_picking"] = True

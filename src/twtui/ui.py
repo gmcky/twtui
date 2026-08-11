@@ -326,7 +326,7 @@ def render_settings(st):
         val_col = Text()
         if f["type"] == "bool":
             val_col.append("[on]" if val else "[off]", style=f"bold {THEME['live']}" if val else "dim")
-        elif f["type"] == "choice":
+        elif f["type"] in ("choice", "preset"):
             val_col.append("‹ ", style="dim")
             val_col.append(str(val), style="white")
             val_col.append(" ›", style="dim")

@@ -13,6 +13,8 @@ STREAMLINK = "streamlink"
 QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
 
 SETTINGS = {
+    # Quick setup
+    "preset": "Balanced",
     # General
     "kill_streams_on_exit": False,
     "kill_orphans_on_start": False,
@@ -68,7 +70,65 @@ CODEC_CHOICES      = ["h264", "av1,h264", "h265,h264", "av1,h265,h264"]
 RINGBUFFER_CHOICES = ["16M", "32M", "64M", "128M"]
 IPVER_CHOICES      = ["auto", "ipv4", "ipv6"]
 
+PRESET_CHOICES = ["Custom", "Balanced", "Low latency", "High quality",
+                  "Data saver", "Unstable connection"]
+
+# Keys a preset fully specifies. A preset is "active" when every one of these
+# equals the preset's fingerprint; otherwise the preset is "Custom".
+BUNDLE_KEYS = ["quality", "low_latency", "hls_live_edge", "twitch_codecs",
+               "retry_streams", "retry_max", "retry_open", "stream_timeout",
+               "ringbuffer_size", "segment_threads", "ip_version"]
+
+PRESETS = {
+    "Balanced": {
+        "quality":"best", "low_latency":True, "hls_live_edge":3, "twitch_codecs":"h264",
+        "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
+        "ringbuffer_size":"16M", "segment_threads":1, "ip_version":"auto",
+    },
+    "Low latency": {
+        "quality":"best", "low_latency":True, "hls_live_edge":3, "twitch_codecs":"h264",
+        "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
+        "ringbuffer_size":"16M", "segment_threads":2, "ip_version":"auto",
+    },
+    "High quality": {
+        "quality":"best", "low_latency":False, "hls_live_edge":3, "twitch_codecs":"av1,h264",
+        "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
+        "ringbuffer_size":"64M", "segment_threads":2, "ip_version":"auto",
+    },
+    "Data saver": {
+        "quality":"480p", "low_latency":False, "hls_live_edge":3, "twitch_codecs":"h264",
+        "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
+        "ringbuffer_size":"16M", "segment_threads":1, "ip_version":"auto",
+    },
+    "Unstable connection": {
+        "quality":"720p", "low_latency":False, "hls_live_edge":3, "twitch_codecs":"h264",
+        "retry_streams":5, "retry_max":0, "retry_open":3, "stream_timeout":180,
+        "ringbuffer_size":"64M", "segment_threads":3, "ip_version":"auto",
+    },
+}
+
+def apply_preset(name):
+    """Overwrite the bundled settings with a named preset."""
+    bundle = PRESETS.get(name)
+    if not bundle:
+        return
+    SETTINGS.update(bundle)
+    SETTINGS["preset"] = name
+
+
+def detect_preset():
+    """Return the preset name whose fingerprint matches current settings, else 'Custom'."""
+    for name, bundle in PRESETS.items():
+        if all(SETTINGS.get(k) == v for k, v in bundle.items()):
+            return name
+    return "Custom"
+
+
 SETTINGS_SCHEMA = [
+    ("Quick setup", [
+        {"key":"preset", "type":"preset", "choices":PRESET_CHOICES,
+         "label":"Preset", "help":"one-pick bundle; editing any streamlink setting = Custom"},
+    ]),
     ("General", [
         {"key": "kill_streams_on_exit",     "type": "bool",   "label": "Kill streams on exit",        "help": "close all open streams when you quit"},
         {"key": "kill_orphans_on_start",    "type": "bool",   "label": "Kill ended streams on start", "help": "on launch, close players whose stream already ended"},
@@ -254,6 +314,7 @@ def load_config():
     rebuild_keybinds()
 
 def save_config():
+    SETTINGS["preset"] = detect_preset()
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(SETTINGS, f, indent=2)
