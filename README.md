@@ -44,10 +44,21 @@ API key.
 - Follow / unfollow from anywhere; the list is saved per user.
 - Open a stream in your player with one key; a launch that dies right away is
   flagged `✗ failed` instead of pretending to be open.
-- Settings screen (saved to config.json): stream quality, low-latency, custom
-  streamlink flags, theme colors, rebindable hotkeys, list auto-refresh, result
-  counts, kill-on-exit, confirm-before-quit, startup cleanup of orphaned streams,
-  and (Windows) run-on-startup.
+- Quick presets (Balanced, Low latency, High quality, Data saver, Unstable
+  connection) set a whole bundle of streamlink options in one pick; edit any of
+  them and the preset shows as Custom.
+- Deep streamlink control without knowing the flags: quality, low-latency, codecs,
+  live edge, player path/args, retries, timeout, buffer size, segment threads,
+  proxy, IPv4/IPv6 - all as plain settings.
+- Watch VODs: type a `twitch.tv/videos/<id>`, a bare id, or `videos/<id>` in search
+  and open the past broadcast with a fully seekable timeline.
+- Record / DVR: write the live stream to a `.ts` while watching; `d` opens the
+  growing file in a second player so you can seek backward. `--hls-live-restart`
+  optionally starts nearer the beginning of the available window.
+- Settings screen (saved to config.json), organized in sections: Quick setup,
+  General, Streamlink, Network, Recording, Appearance (theme colors), Lists
+  (auto-refresh, result counts), Hotkeys (rebindable), System (kill-on-exit,
+  confirm-before-quit, startup cleanup, Windows run-on-startup).
 - Hotkeys work on any keyboard layout and can be rebound.
 
 ## Install
@@ -76,6 +87,12 @@ python -m twtui.app
   - Linux: `~/.config/twitch-tui/channels.txt`
   - macOS: `~/Library/Application Support/twitch-tui/channels.txt`
 - `Enter` on a channel opens it in your player.
+- To watch a past broadcast, open search (`Tab`) and type a VOD reference -
+  `twitch.tv/videos/123456789`, `videos/123456789`, or just the numeric id - then
+  `Enter`. VODs are fully seekable; live streams are not (Twitch only serves a short
+  live window).
+- To record while watching, turn on Recording in settings and set a folder. `d` on
+  the followed list opens that recording in a second player with a seekable timeline.
 
 ## Keys
 
@@ -88,6 +105,7 @@ python -m twtui.app
 | `Ctrl+F` | Follow / unfollow (in search or a category) |
 | `f` | Unfollow (in the followed list) |
 | `r` | Refresh live status |
+| `d` | Open the selected channel's recording in a second player (when recording) |
 | `s` | Settings |
 | `Ctrl+Q` | Quit (from anywhere) |
 | `Esc` | Back / quit |
