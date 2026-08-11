@@ -187,6 +187,7 @@ def main():
         sync_th.start()
 
         def autorefresh_worker():
+            nonlocal selected
             while not st["stop"]:
                 secs = SETTINGS["list_autorefresh_secs"]
                 if secs <= 0:
@@ -200,9 +201,14 @@ def main():
                 if st["mode"] != "list": continue
                 new_status = get_status(channels)
                 with lock:
+                    cur = channels[selected] if 0 <= selected < len(channels) else None
                     status.clear()
                     status.update(new_status)
                     sort_channels(channels, status)
+                    if cur is not None and cur in channels:
+                        selected = channels.index(cur)
+                    else:
+                        selected = min(selected, max(len(channels) - 1, 0))
                 if st["mode"] == "list":
                     paint_list()
 
