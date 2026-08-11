@@ -38,6 +38,10 @@ SETTINGS = {
     "segment_threads": 1,          # --stream-segment-threads
     "http_proxy":      "",         # --http-proxy URL
     "ip_version":      "auto",     # auto | ipv4 | ipv6  -> --ipv4 / --ipv6
+    # Recording
+    "record_streams": False,       # write .ts while watching
+    "record_dir":     "",          # folder for recordings (blank = skip recording)
+    "dvr_restart":    False,       # add --hls-live-restart (rewind within window)
     # Appearance
     "color_accent":       "magenta",
     "color_cursor":       "cyan",
@@ -155,6 +159,11 @@ SETTINGS_SCHEMA = [
         {"key":"http_proxy",      "type":"text","label":"HTTP proxy", "help":"--http-proxy URL (blank = none)"},
         {"key":"ip_version",      "type":"choice","choices":IPVER_CHOICES,          "label":"IP version",     "help":"force IPv4/IPv6 or auto"},
     ]),
+    ("Recording", [
+        {"key":"record_streams",  "type":"bool",  "label":"Record streams", "help":"write .ts while watching"},
+        {"key":"record_dir",      "type":"text",  "label":"Record directory","help":"folder for recordings (blank = skip recording)"},
+        {"key":"dvr_restart",     "type":"bool",  "label":"DVR restart",    "help":"add --hls-live-restart (rewind within window)"},
+    ]),
     ("Appearance", [
         {"key":"color_accent",      "type":"color","choices":COLOR_CHOICES,"label":"Accent",        "help":"panel borders + titles"},
         {"key":"color_cursor",      "type":"color","choices":COLOR_CHOICES,"label":"Cursor",        "help":"selection cursor + caret"},
@@ -224,6 +233,18 @@ def build_stream_cmd(channel):
         args += ["--ipv4"]
     elif s["ip_version"] == "ipv6":
         args += ["--ipv6"]
+
+    if s["dvr_restart"]:
+        args += ["--hls-live-restart"]
+    if s["record_streams"] and s["record_dir"].strip():
+        import os, time as _t
+        try:
+            os.makedirs(s["record_dir"].strip(), exist_ok=True)
+            fname = f"{channel}-{_t.strftime('%Y%m%d-%H%M%S')}.ts"
+            path = os.path.join(s["record_dir"].strip(), fname)
+            args += ["--record", path]   # --record plays live AND saves
+        except Exception:
+            pass
 
     # Custom flags LAST so a power user can override anything above.
     extra = s["custom_flags"].strip()
