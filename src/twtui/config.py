@@ -310,6 +310,7 @@ def load_config():
                         elif f["type"] == "key" and isinstance(val, str) and len(val) == 1:
                             SETTINGS[k] = val
                         break
+    SETTINGS["preset"] = detect_preset()
     rebuild_theme()
     rebuild_keybinds()
 
