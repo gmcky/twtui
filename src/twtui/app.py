@@ -19,7 +19,7 @@ from twtui.ui import (
 )
 from twtui.streams import (
     launch, sync_state, cleanup_on_start, install_exit_handlers,
-    stream_alive, LAUNCH_GRACE,
+    stream_alive, LAUNCH_GRACE, open_recording,
 )
 
 
@@ -584,6 +584,9 @@ def main():
                         request_quit()
                         if st["stop"]:
                             break
+                    elif char and char.lower() in ("d", "в"):   # open recording in 2nd player (seekable)
+                        if channels:
+                            open_recording(channels[selected])
         finally:
             term_restore(term_state)
 

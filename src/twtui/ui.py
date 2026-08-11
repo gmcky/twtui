@@ -72,10 +72,11 @@ def render(channels, status, selected, checking, opened, failed):
         Text("no followed channels — press tab to search & follow", style="dim"),
         vertical="middle",
     )
+    rec_hint = " · d rec" if SETTINGS.get("record_streams") else ""
     body = Panel(
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
-        subtitle="[dim]↑↓ move · enter watch · f unfollow · r refresh · tab search · s settings · q quit[/]",
+        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint} · tab search · s settings · q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
     )

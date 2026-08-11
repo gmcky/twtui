@@ -38,6 +38,13 @@ def stream_alive(entry):
     except psutil.Error:
         return False
 
+def _record_path_of(cmd):
+    # Pull the --record target back out of the built command, if any.
+    try:
+        return cmd[cmd.index("--record") + 1]
+    except (ValueError, IndexError):
+        return None
+
 def launch(channel):
     cmd = build_stream_cmd(channel)
     hide = SETTINGS["hide_stream_console"]
@@ -59,6 +66,7 @@ def launch(channel):
             "player_create": None,
             "player_name": None,
             "channel": channel,
+            "record_path": _record_path_of(cmd),
             "started": time.time(),
         }
         with _lock:
@@ -210,6 +218,34 @@ def cleanup_on_start():
             os.remove(STREAMS_FILE)
     except Exception:
         pass
+
+def open_recording(channel):
+    """Open the growing recording of a live channel in a second player, giving a
+    seekable DVR view. Returns True if a player was spawned."""
+    with _lock:
+        entry = next(
+            (e for e in _open_streams
+             if e["channel"] == channel and e.get("record_path")),
+            None,
+        )
+    if not entry:
+        return False
+    path = entry["record_path"]
+    if not path or not os.path.exists(path):
+        return False
+    player = SETTINGS.get("player_path", "").strip()
+    try:
+        if player:
+            subprocess.Popen([player, path])
+        elif sys.platform == "win32":
+            os.startfile(path)
+        elif sys.platform == "darwin":
+            subprocess.Popen(["open", path])
+        else:
+            subprocess.Popen(["xdg-open", path])
+        return True
+    except Exception:
+        return False
 
 def install_exit_handlers():
     atexit.register(kill_streams)
