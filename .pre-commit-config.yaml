@@ -1,0 +1,18 @@
+# Blocking pre-commit gate: ruff lint (with autofix) + ruff format on staged files.
+# Uses the ruff already on PATH (installed via `uv tool install ruff`), no network
+# clone needed. Config for both lives in pyproject.toml [tool.ruff].
+repos:
+  - repo: local
+    hooks:
+      - id: ruff-check
+        name: ruff check
+        entry: ruff check --fix
+        language: system
+        types_or: [python, pyi]
+        require_serial: true
+      - id: ruff-format
+        name: ruff format
+        entry: ruff format
+        language: system
+        types_or: [python, pyi]
+        require_serial: true

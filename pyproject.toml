@@ -22,3 +22,16 @@ Homepage = "https://github.com/gmcky/twtui"
 [tool.setuptools]
 package-dir = { "" = "src" }
 packages = ["twtui"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+src = ["src"]
+
+[tool.ruff.lint]
+# E4/E7/E9 + F (pyflakes) + I (import sort). Line length is the formatter's job,
+# so E501 stays off; the aligned tables in config.py are guarded with fmt: off.
+select = ["E4", "E7", "E9", "F", "I"]
+
+[tool.ruff.format]
+quote-style = "double"
