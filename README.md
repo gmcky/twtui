@@ -52,13 +52,17 @@ API key.
   proxy, IPv4/IPv6 - all as plain settings.
 - Watch VODs: type a `twitch.tv/videos/<id>`, a bare id, or `videos/<id>` in search
   and open the past broadcast with a fully seekable timeline.
+- Browse a channel's past broadcasts: `Ctrl+V` on any channel (followed list or a
+  search result) opens its recent VODs (title, date, length, views) to pick and watch.
+- Watch clips: paste a `clips.twitch.tv/<slug>` or `twitch.tv/<chan>/clip/<slug>`
+  link in search and it opens the clip, fully seekable.
 - Record / DVR: write the live stream to a `.ts` while watching; `d` opens the
   growing file in a second player so you can seek backward. `--hls-live-restart`
   optionally starts nearer the beginning of the available window.
 - Settings screen (saved to config.json), organized in sections: Quick setup,
   General, Streamlink, Network, Recording, Appearance (theme colors), Lists
   (auto-refresh, result counts), Hotkeys (rebindable), System (kill-on-exit,
-  confirm-before-quit, startup cleanup, Windows run-on-startup).
+  confirm-before-quit, startup cleanup, run-on-startup on Windows, macOS and Linux).
 - Hotkeys work on any keyboard layout and can be rebound.
 
 ## Install
@@ -91,6 +95,11 @@ python -m twtui.app
   `twitch.tv/videos/123456789`, `videos/123456789`, or just the numeric id - then
   `Enter`. VODs are fully seekable; live streams are not (Twitch only serves a short
   live window).
+- To browse a channel's past broadcasts, press `Ctrl+V` on it (in the followed list
+  or on a search result). Pick a VOD from the list and `Enter` to watch it, fully
+  seekable. Type in that view to filter by title.
+- To watch a clip, open search (`Tab`) and paste a clip link
+  (`clips.twitch.tv/<slug>` or `twitch.tv/<chan>/clip/<slug>`), then `Enter`.
 - To record while watching, turn on Recording in settings and set a folder. `d` on
   the followed list opens that recording in a second player with a seekable timeline.
 
@@ -103,6 +112,7 @@ python -m twtui.app
 | `Tab` | Switch followed list ⇄ search |
 | `←` `→` | Switch Streamers / Categories (in search) |
 | `Ctrl+F` | Follow / unfollow (in search or a category) |
+| `Ctrl+V` | Browse the selected channel's past VODs (followed list or search) |
 | `f` | Unfollow (in the followed list) |
 | `r` | Refresh live status |
 | `d` | Open the selected channel's recording in a second player (when recording) |

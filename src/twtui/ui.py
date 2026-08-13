@@ -81,7 +81,7 @@ def render(channels, status, selected, checking, opened, failed):
     body = Panel(
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
-        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint} · tab search · s settings · q quit[/]",
+        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint} · ctrl+v VODs · tab search · s settings · q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
     )
@@ -181,7 +181,7 @@ def render_search(st, opened, followed):
     search_panel = Panel(
         query_text,
         title=f"[bold {THEME['accent']}]search twitch[/]",
-        subtitle="[dim]type · ←/→ switch · ↑↓ move · enter watch · ctrl+f follow · esc list · ctrl+q quit[/]",
+        subtitle="[dim]type · ←/→ switch · ↑↓ move · enter watch · ctrl+v VODs · ctrl+f follow · esc list · ctrl+q quit[/]",
         border_style=THEME["accent"],
         padding=(0, 1),
     )
@@ -247,6 +247,64 @@ def render_cats(st):
         title = _scroll_title("categories", start, end, len(results))
     body = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
     return Group(_tabs("cats"), search_panel, body)
+
+
+def _fmt_len(secs):
+    h, rem = divmod(int(secs), 3600)
+    m, s = divmod(rem, 60)
+    return f"{h}:{m:02d}:{s:02d}" if h else f"{m}:{s:02d}"
+
+
+def render_channel(st):
+    g = st["ch_display"]
+    query_text = Text.assemble(
+        ("❱ ", f"bold {THEME['cursor']}"), (st["ch_query"], "white"), ("▉", THEME["cursor"])
+    )
+    search_panel = Panel(
+        query_text,
+        title=f"[bold {THEME['accent']}]{g} — past broadcasts[/]",
+        subtitle="[dim]filter · ↑↓ move · enter watch VOD · esc back · ctrl+q quit[/]",
+        border_style=THEME["accent"],
+        padding=(0, 1),
+    )
+    vids = st["ch_videos"]
+    title = f"[bold {THEME['accent']}]VODs[/]"
+    if st["ch_searching"] and not vids:
+        inner = Align.center(
+            Spinner("dots", text=Text(" loading …", style="cyan"), style=THEME["accent"]),
+            vertical="middle",
+        )
+    elif not vids:
+        inner = Align.center(Text(f"no VODs for '{g}'", style="dim"), vertical="middle")
+    else:
+        filtered = [v for v in vids if st["ch_query"].strip().lower() in v["title"].lower()]
+        if not filtered:
+            inner = Align.center(Text("no VODs match filter", style="dim"), vertical="middle")
+        else:
+            vis, rsel, start, end = _window(filtered, st["ch_sel"], _max_rows(8))
+            table = Table(
+                show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True
+            )
+            table.add_column("", width=2, no_wrap=True)
+            table.add_column("Title", ratio=2, no_wrap=True, overflow="ellipsis")
+            table.add_column("Date", width=10, no_wrap=True)
+            table.add_column("Length", width=8, no_wrap=True)
+            table.add_column("Views", justify="right", width=9, no_wrap=True)
+            for i, v in enumerate(vis):
+                is_sel = i == rsel
+                cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
+                name_style = f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
+                table.add_row(
+                    cursor,
+                    Text(f" {v['title']} ", style=name_style),
+                    Text(v["date"], style="dim"),
+                    Text(_fmt_len(v["length"]), style="cyan"),
+                    Text(f"{v['views']:,}", style=THEME["live"]),
+                )
+            inner = table
+            title = _scroll_title("VODs", start, end, len(filtered))
+    body = Panel(inner, title=title, border_style=THEME["accent"], padding=(1, 2))
+    return Group(search_panel, body)
 
 
 def render_cat(st, opened, followed):

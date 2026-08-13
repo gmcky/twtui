@@ -233,7 +233,7 @@ SETTINGS_SCHEMA = [
         {"key":"key_settings","type":"key","label":"Settings", "help":"open this screen"},
     ]),
     ("System", [
-        {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when Windows starts (Windows only)"},
+        {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when your computer starts"},
     ]),
 ]
 # fmt: on
@@ -251,6 +251,30 @@ def vod_target(query):
     return None
 
 
+def clip_target(query):
+    """Return a normalized clip URL if the query references a Twitch clip, else None.
+    Accepts clips.twitch.tv/<slug>, twitch.tv/<chan>/clip/<slug>, m.twitch.tv/clip/<slug>,
+    or a bare clip slug pasted alone."""
+    q = query.strip()
+    m = re.search(r"clips\.twitch\.tv/([A-Za-z0-9-]+)", q)
+    if m:
+        return f"https://clips.twitch.tv/{m.group(1)}"
+    m = re.search(r"twitch\.tv/\w+/clip/([A-Za-z0-9-]+)", q)
+    if m:
+        return f"https://clips.twitch.tv/{m.group(1)}"
+    m = re.search(r"/clip/([A-Za-z0-9-]+)", q)
+    if m:
+        return f"https://clips.twitch.tv/{m.group(1)}"
+    return None
+
+
+def _safe_filename(name):
+    """Make a target string safe as a filename on all platforms."""
+    out = re.sub(r'[<>:"/\\|?*]', "-", name)
+    out = out.strip(". ")
+    return out or "stream"
+
+
 def build_stream_cmd(target):
     """target = a channel login, or a VOD ("videos/<id>" or a full twitch URL)."""
     s = SETTINGS
@@ -261,12 +285,14 @@ def build_stream_cmd(target):
     else:
         url = f"twitch.tv/{target}"
     is_vod = "videos/" in url
+    is_clip = "clips.twitch.tv/" in url or "/clip/" in url
+    is_static = is_vod or is_clip
 
     args = [STREAMLINK, url, s["quality"]]
 
     # Latency: low_latency manages its own live edge; only pass a manual
     # --hls-live-edge when low_latency is OFF.
-    if not is_vod:
+    if not is_static:
         if s["low_latency"]:
             args += ["--twitch-low-latency"]
         else:
@@ -283,7 +309,7 @@ def build_stream_cmd(target):
         args += ["--player-args", s["player_args"].strip()]
 
     # Reliability. Each 0/default value means "omit the flag".
-    if not is_vod:
+    if not is_static:
         if s["retry_streams"] > 0:
             args += ["--retry-streams", str(s["retry_streams"])]
             # retry_max only meaningful while retrying; 0 -> unlimited (omit flag).
@@ -306,7 +332,7 @@ def build_stream_cmd(target):
     elif s["ip_version"] == "ipv6":
         args += ["--ipv6"]
 
-    if not is_vod and s["dvr_restart"]:
+    if not is_static and s["dvr_restart"]:
         args += ["--hls-live-restart"]
     if s["record_streams"] and s["record_dir"].strip():
         import os
@@ -314,7 +340,7 @@ def build_stream_cmd(target):
 
         try:
             os.makedirs(s["record_dir"].strip(), exist_ok=True)
-            safe = target.replace("/", "-")
+            safe = _safe_filename(target)
             fname = f"{safe}-{_t.strftime('%Y%m%d-%H%M%S')}.ts"
             path = os.path.join(s["record_dir"].strip(), fname)
             args += ["--record", path]  # --record plays live AND saves
@@ -421,7 +447,25 @@ def load_config():
     rebuild_keybinds()
 
 
+APP_STARTUP_NAME = "twtui"
+
+
+def _startup_argv():
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [sys.executable, "-m", "twtui.app"]
+
+
 def set_run_on_startup(enabled):
+    if sys.platform == "win32":
+        _win_startup(enabled)
+    elif sys.platform == "darwin":
+        _macos_startup(enabled, os.path.expanduser("~"))
+    else:
+        _linux_startup(enabled, os.path.expanduser("~"))
+
+
+def _win_startup(enabled):
     """Add or remove the HKCU Run entry (Windows only). No-op elsewhere."""
     if sys.platform != "win32":
         return
@@ -447,6 +491,63 @@ def set_run_on_startup(enabled):
             except FileNotFoundError:
                 pass
         winreg.CloseKey(key)
+    except Exception:
+        pass
+
+
+def _linux_startup(enabled, home):
+    """XDG autostart: ~/.config/autostart/twtui.desktop."""
+    try:
+        d = os.path.join(home, ".config", "autostart")
+        path = os.path.join(d, f"{APP_STARTUP_NAME}.desktop")
+        if enabled:
+            os.makedirs(d, exist_ok=True)
+            exec_line = shlex.join(_startup_argv())
+            content = (
+                "[Desktop Entry]\n"
+                "Type=Application\n"
+                "Name=twtui\n"
+                f"Exec={exec_line}\n"
+                "Terminal=true\n"
+                "X-GNOME-Autostart-enabled=true\n"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            if os.path.exists(path):
+                os.remove(path)
+    except Exception:
+        pass
+
+
+def _macos_startup(enabled, home):
+    """LaunchAgent: ~/Library/LaunchAgents/com.twtui.plist."""
+    try:
+        d = os.path.join(home, "Library", "LaunchAgents")
+        path = os.path.join(d, "com.twtui.plist")
+        if enabled:
+            os.makedirs(d, exist_ok=True)
+            args_xml = "".join(f"    <string>{a}</string>\n" for a in _startup_argv())
+            content = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+                '<plist version="1.0">\n'
+                "<dict>\n"
+                "  <key>Label</key><string>com.twtui</string>\n"
+                "  <key>ProgramArguments</key>\n"
+                "  <array>\n"
+                f"{args_xml}"
+                "  </array>\n"
+                "  <key>RunAtLoad</key><true/>\n"
+                "</dict>\n"
+                "</plist>\n"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            if os.path.exists(path):
+                os.remove(path)
     except Exception:
         pass
 

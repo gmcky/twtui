@@ -7,6 +7,7 @@ from rich.live import Live
 
 from twtui.api import (
     OFFLINE,
+    channel_videos,
     game_streams,
     get_status,
     search_games,
@@ -17,6 +18,7 @@ from twtui.config import (
     SETTINGS,
     SETTINGS_SCHEMA,
     apply_preset,
+    clip_target,
     load_channels,
     load_config,
     rebuild_keybinds,
@@ -44,6 +46,7 @@ from twtui.ui import (
     render,
     render_cat,
     render_cats,
+    render_channel,
     render_confirm,
     render_search,
     render_settings,
@@ -97,6 +100,13 @@ def main():
         "cat_streams": [],
         "cat_ch_query": "",
         "cat_ch_sel": 0,
+        "ch_login": "",
+        "ch_display": "",
+        "ch_videos": [],
+        "ch_query": "",
+        "ch_sel": 0,
+        "ch_searching": False,
+        "ch_back": "list",
         "stop": False,
         "confirm_quit": False,
         "failed": {},
@@ -124,6 +134,30 @@ def main():
 
         def paint_cat():
             live.update(render_cat(st, opened, followed), refresh=True)
+
+        def paint_channel():
+            live.update(render_channel(st), refresh=True)
+
+        def open_channel(login, display, back_mode):
+            st["mode"] = "channel"
+            st["ch_login"] = login
+            st["ch_display"] = display
+            st["ch_back"] = back_mode
+            with lock:
+                st["ch_query"], st["ch_videos"], st["ch_sel"] = "", [], 0
+                st["ch_searching"] = True
+            paint_channel()
+
+            def _load():
+                vids = channel_videos(login)
+                with lock:
+                    if st["ch_login"] == login:
+                        st["ch_videos"] = vids
+                        st["ch_searching"] = False
+                if st["mode"] == "channel" and st["ch_login"] == login:
+                    paint_channel()
+
+            threading.Thread(target=_load, daemon=True).start()
 
         def watch_launch(ch, entry):
             time.sleep(LAUNCH_GRACE)
@@ -320,6 +354,8 @@ def main():
                             paint_cats()
                         elif mode == "cat":
                             paint_cat()
+                        elif mode == "channel":
+                            paint_channel()
                         elif mode == "settings":
                             paint_settings()
                     continue
@@ -476,11 +512,19 @@ def main():
                             if st["cat_results"]:
                                 st["cat_sel"] = (st["cat_sel"] + delta) % len(st["cat_results"])
                         paint_cats()
-                    else:  # cat
+                    elif mode == "cat":
                         n = len(_filter_streams(st["cat_streams"], st["cat_ch_query"]))
                         if n:
                             st["cat_ch_sel"] = (st["cat_ch_sel"] + delta) % n
                         paint_cat()
+                    elif mode == "channel":
+                        vids = st["ch_videos"]
+                        filtered = [
+                            v for v in vids if st["ch_query"].strip().lower() in v["title"].lower()
+                        ]
+                        if filtered:
+                            st["ch_sel"] = (st["ch_sel"] + delta) % len(filtered)
+                        paint_channel()
                     continue
 
                 if tok in ("LEFT", "RIGHT"):  # switch streamers/categories
@@ -559,11 +603,52 @@ def main():
                         paint_cat()
                     continue
 
+                if mode == "channel":
+                    vids = st["ch_videos"]
+                    filtered = [
+                        v for v in vids if st["ch_query"].strip().lower() in v["title"].lower()
+                    ]
+                    if tok == "ENTER":
+                        res = filtered[st["ch_sel"]] if filtered else None
+                        if res:
+                            do_launch(f"videos/{res['id']}", paint_channel)
+                    elif tok == "ESC":
+                        st["mode"] = st["ch_back"]
+                        if st["mode"] == "list":
+                            paint_list()
+                        elif st["mode"] == "search":
+                            paint_search()
+                    elif tok == "BACKSPACE":
+                        st["ch_query"] = st["ch_query"][:-1]
+                        st["ch_sel"] = 0
+                        paint_channel()
+                    elif char is not None:
+                        st["ch_query"] += char
+                        st["ch_sel"] = 0
+                        paint_channel()
+                    continue
+
+                if tok == "CTRL_V":
+                    if mode == "list" and channels:
+                        ch = channels[selected]
+                        meta = status.get(ch) or OFFLINE
+                        disp = meta.get("display", ch)
+                        open_channel(ch, disp, "list")
+                    elif mode == "search":
+                        with lock:
+                            res = st["results"][st["sel"]] if st["results"] else None
+                        if res:
+                            open_channel(res["login"], res["display"], "search")
+                    continue
+
                 if mode == "search":
                     if tok == "ENTER":
                         vt = vod_target(st["query"])
+                        ct = clip_target(st["query"]) if not vt else None
                         if vt:
                             do_launch(vt, paint_search)
+                        elif ct:
+                            do_launch(ct, paint_search)
                         else:
                             with lock:
                                 res = st["results"][st["sel"]] if st["results"] else None
