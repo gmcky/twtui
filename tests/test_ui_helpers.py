@@ -12,6 +12,26 @@ def test_filter_streams():
     assert len(_filter_streams(streams, "")) == 2
 
 
+def test_window_end():
+    items = list(range(10))
+    vis, sel, start, end = _window(items, 9, 3)
+    assert vis == [7, 8, 9]
+    assert sel == 2
+    assert start == 7
+    assert end == 10
+
+
+def test_fmt_len():
+    from twtui.ui import _fmt_len
+
+    assert _fmt_len(0) == "0:00"
+    assert _fmt_len(59) == "0:59"
+    assert _fmt_len(60) == "1:00"
+    assert _fmt_len(3599) == "59:59"
+    assert _fmt_len(3600) == "1:00:00"
+    assert _fmt_len(3661) == "1:01:01"
+
+
 def test_window():
     items = list(range(10))
 

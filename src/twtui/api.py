@@ -71,6 +71,19 @@ query($name: String!, $n: Int!) {
 }
 """
 
+CHANNEL_VIDEOS_QUERY = """
+query($login: String!, $n: Int!) {
+  user(login: $login) {
+    videos(first: $n, sort: TIME, type: ARCHIVE) {
+      edges { node {
+        id title lengthSeconds publishedAt viewCount
+        game { displayName }
+      } }
+    }
+  }
+}
+"""
+
 
 def _gql(query, variables):
     return requests.post(
@@ -203,6 +216,33 @@ def game_streams(name, limit=100):
                 "display": b.get("displayName") or login,
                 "live": True,
                 "viewers": n.get("viewersCount") or 0,
+                "game": (n.get("game") or {}).get("displayName") or "",
+            }
+        )
+    return out
+
+
+def channel_videos(login, limit=20):
+    # Recent past broadcasts (VODs) for a channel, newest first.
+    try:
+        edges = _gql(CHANNEL_VIDEOS_QUERY, {"login": login, "n": limit})["data"]["user"]["videos"][
+            "edges"
+        ]
+    except Exception:
+        return []
+    out = []
+    for e in edges:
+        n = e["node"]
+        vid = n.get("id")
+        if not vid:
+            continue
+        out.append(
+            {
+                "id": vid,
+                "title": n.get("title") or "untitled",
+                "length": n.get("lengthSeconds") or 0,
+                "date": (n.get("publishedAt") or "")[:10],
+                "views": n.get("viewCount") or 0,
                 "game": (n.get("game") or {}).get("displayName") or "",
             }
         )

@@ -121,6 +121,42 @@ def test_game_streams(monkeypatch):
     assert api.game_streams("G") == []
 
 
+def test_channel_videos(monkeypatch):
+    from twtui import api
+
+    def mock_gql(q, v):
+        return {
+            "data": {
+                "user": {
+                    "videos": {
+                        "edges": [
+                            {
+                                "node": {
+                                    "id": "123456",
+                                    "title": "Test VOD",
+                                    "lengthSeconds": 3661,
+                                    "publishedAt": "2023-10-10T12:00:00Z",
+                                    "viewCount": 500,
+                                    "game": {"displayName": "Just Chatting"},
+                                }
+                            }
+                        ]
+                    }
+                }
+            }
+        }
+
+    monkeypatch.setattr(api, "_gql", mock_gql)
+    res = api.channel_videos("test", limit=1)
+    assert len(res) == 1
+    assert res[0]["id"] == "123456"
+    assert res[0]["title"] == "Test VOD"
+    assert res[0]["length"] == 3661
+    assert res[0]["date"] == "2023-10-10"
+    assert res[0]["views"] == 500
+    assert res[0]["game"] == "Just Chatting"
+
+
 def test_parser_exception(monkeypatch):
     from twtui import api
 

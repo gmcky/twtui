@@ -8,7 +8,19 @@ KEYBINDS = {"q": "q", "r": "r", "f": "f", "/": "/", "s": "s"}
 FOLD = {"й": "q", "к": "r", "а": "f", "ы": "s"}
 
 # Normalised special-key tokens returned by read_key().
-SPECIAL = {"UP", "DOWN", "LEFT", "RIGHT", "ENTER", "ESC", "BACKSPACE", "TAB", "CTRL_F", "CTRL_Q"}
+SPECIAL = {
+    "UP",
+    "DOWN",
+    "LEFT",
+    "RIGHT",
+    "ENTER",
+    "ESC",
+    "BACKSPACE",
+    "TAB",
+    "CTRL_F",
+    "CTRL_V",
+    "CTRL_Q",
+}
 
 # Raw control characters -> tokens.
 CTRL = {
@@ -19,6 +31,7 @@ CTRL = {
     "\x08": "BACKSPACE",
     "\t": "TAB",
     "\x06": "CTRL_F",
+    "\x16": "CTRL_V",
     "\x11": "CTRL_Q",
 }
 
