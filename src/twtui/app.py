@@ -17,6 +17,7 @@ from twtui.config import (
     SETTINGS,
     SETTINGS_SCHEMA,
     apply_preset,
+    clip_target,
     load_channels,
     load_config,
     rebuild_keybinds,
@@ -562,8 +563,11 @@ def main():
                 if mode == "search":
                     if tok == "ENTER":
                         vt = vod_target(st["query"])
+                        ct = clip_target(st["query"]) if not vt else None
                         if vt:
                             do_launch(vt, paint_search)
+                        elif ct:
+                            do_launch(ct, paint_search)
                         else:
                             with lock:
                                 res = st["results"][st["sel"]] if st["results"] else None

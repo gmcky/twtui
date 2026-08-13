@@ -101,3 +101,33 @@ def test_vod_target(settings):
 def test_full_url(settings):
     cmd = build_stream_cmd("https://twitch.tv/foo")
     assert cmd[1] == "https://twitch.tv/foo"
+
+
+def test_clip_target(settings):
+    settings["low_latency"] = True
+    settings["retry_streams"] = 2
+    settings["dvr_restart"] = True
+    cmd = build_stream_cmd("https://clips.twitch.tv/Foo")
+    assert cmd[1] == "https://clips.twitch.tv/Foo"
+    assert "--twitch-low-latency" not in cmd
+    assert "--hls-live-edge" not in cmd
+    assert "--retry-streams" not in cmd
+    assert "--hls-live-restart" not in cmd
+
+
+def test_safe_filename():
+    from twtui.config import _safe_filename
+
+    assert _safe_filename("https://twitch.tv/videos/123") == "https---twitch.tv-videos-123"
+
+
+def test_record_clip(settings, tmp_path):
+    settings["record_streams"] = True
+    settings["record_dir"] = str(tmp_path)
+    cmd = build_stream_cmd("https://clips.twitch.tv/Foo")
+    assert "--record" in cmd
+    record_path = cmd[cmd.index("--record") + 1]
+    import os
+
+    basename = os.path.basename(record_path)
+    assert not any(c in basename for c in [":", "/", "\\", "?", "*"])
