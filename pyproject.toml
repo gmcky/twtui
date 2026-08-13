@@ -13,6 +13,9 @@ authors = [{ name = "gmcky" }]
 keywords = ["twitch", "tui", "terminal", "streamlink", "cli"]
 dependencies = ["rich>=13", "requests>=2", "psutil>=5.9"]
 
+[project.optional-dependencies]
+dev = ["pytest>=7"]
+
 [project.scripts]
 twtui = "twtui.app:main"
 
@@ -35,3 +38,8 @@ select = ["E4", "E7", "E9", "F", "I"]
 
 [tool.ruff.format]
 quote-style = "double"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]
+
