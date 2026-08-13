@@ -233,7 +233,7 @@ SETTINGS_SCHEMA = [
         {"key":"key_settings","type":"key","label":"Settings", "help":"open this screen"},
     ]),
     ("System", [
-        {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when Windows starts (Windows only)"},
+        {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when your computer starts"},
     ]),
 ]
 # fmt: on
@@ -421,7 +421,25 @@ def load_config():
     rebuild_keybinds()
 
 
+APP_STARTUP_NAME = "twtui"
+
+
+def _startup_argv():
+    if getattr(sys, "frozen", False):
+        return [sys.executable]
+    return [sys.executable, "-m", "twtui.app"]
+
+
 def set_run_on_startup(enabled):
+    if sys.platform == "win32":
+        _win_startup(enabled)
+    elif sys.platform == "darwin":
+        _macos_startup(enabled, os.path.expanduser("~"))
+    else:
+        _linux_startup(enabled, os.path.expanduser("~"))
+
+
+def _win_startup(enabled):
     """Add or remove the HKCU Run entry (Windows only). No-op elsewhere."""
     if sys.platform != "win32":
         return
@@ -447,6 +465,63 @@ def set_run_on_startup(enabled):
             except FileNotFoundError:
                 pass
         winreg.CloseKey(key)
+    except Exception:
+        pass
+
+
+def _linux_startup(enabled, home):
+    """XDG autostart: ~/.config/autostart/twtui.desktop."""
+    try:
+        d = os.path.join(home, ".config", "autostart")
+        path = os.path.join(d, f"{APP_STARTUP_NAME}.desktop")
+        if enabled:
+            os.makedirs(d, exist_ok=True)
+            exec_line = shlex.join(_startup_argv())
+            content = (
+                "[Desktop Entry]\n"
+                "Type=Application\n"
+                "Name=twtui\n"
+                f"Exec={exec_line}\n"
+                "Terminal=true\n"
+                "X-GNOME-Autostart-enabled=true\n"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            if os.path.exists(path):
+                os.remove(path)
+    except Exception:
+        pass
+
+
+def _macos_startup(enabled, home):
+    """LaunchAgent: ~/Library/LaunchAgents/com.twtui.plist."""
+    try:
+        d = os.path.join(home, "Library", "LaunchAgents")
+        path = os.path.join(d, "com.twtui.plist")
+        if enabled:
+            os.makedirs(d, exist_ok=True)
+            args_xml = "".join(f"    <string>{a}</string>\n" for a in _startup_argv())
+            content = (
+                '<?xml version="1.0" encoding="UTF-8"?>\n'
+                '<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" '
+                '"http://www.apple.com/DTDs/PropertyList-1.0.dtd">\n'
+                '<plist version="1.0">\n'
+                "<dict>\n"
+                "  <key>Label</key><string>com.twtui</string>\n"
+                "  <key>ProgramArguments</key>\n"
+                "  <array>\n"
+                f"{args_xml}"
+                "  </array>\n"
+                "  <key>RunAtLoad</key><true/>\n"
+                "</dict>\n"
+                "</plist>\n"
+            )
+            with open(path, "w", encoding="utf-8") as f:
+                f.write(content)
+        else:
+            if os.path.exists(path):
+                os.remove(path)
     except Exception:
         pass
 
