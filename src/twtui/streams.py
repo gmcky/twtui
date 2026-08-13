@@ -1,4 +1,5 @@
 """Stream lifecycle management."""
+
 import atexit
 import ctypes
 import json
@@ -17,6 +18,7 @@ _open_streams = []
 _lock = threading.Lock()
 _handler_routine = None
 
+
 def _write_state(state):
     try:
         temp = STREAMS_FILE + ".tmp"
@@ -27,7 +29,9 @@ def _write_state(state):
     except Exception:
         pass
 
+
 LAUNCH_GRACE = 2.5
+
 
 def stream_alive(entry):
     if not entry:
@@ -38,6 +42,7 @@ def stream_alive(entry):
     except psutil.Error:
         return False
 
+
 def _record_path_of(cmd):
     # Pull the --record target back out of the built command, if any.
     try:
@@ -45,12 +50,15 @@ def _record_path_of(cmd):
     except (ValueError, IndexError):
         return None
 
+
 def launch(channel):
     cmd = build_stream_cmd(channel)
     hide = SETTINGS["hide_stream_console"]
     kwargs = {}
     if sys.platform == "win32":
-        kwargs["creationflags"] = subprocess.CREATE_NO_WINDOW if hide else subprocess.CREATE_NEW_CONSOLE
+        kwargs["creationflags"] = (
+            subprocess.CREATE_NO_WINDOW if hide else subprocess.CREATE_NEW_CONSOLE
+        )
     else:
         kwargs["start_new_session"] = True
         if hide:
@@ -76,6 +84,7 @@ def launch(channel):
     except Exception:
         return None
 
+
 def sync_state():
     with _lock:
         to_keep = []
@@ -94,7 +103,7 @@ def sync_state():
                             entry["player_name"] = child.name()
             except psutil.Error:
                 pass
-            
+
             player_alive = False
             if entry["player_pid"] is not None:
                 try:
@@ -103,13 +112,13 @@ def sync_state():
                         player_alive = True
                 except psutil.Error:
                     pass
-            
+
             if slink_alive or player_alive:
                 to_keep.append(entry)
-        
+
         _open_streams.clear()
         _open_streams.extend(to_keep)
-        
+
         if not to_keep:
             try:
                 if os.path.exists(STREAMS_FILE):
@@ -119,12 +128,13 @@ def sync_state():
         else:
             _write_state(to_keep)
 
+
 def kill_tree(pid, create_time):
     try:
         proc = psutil.Process(pid)
         if proc.create_time() != create_time:
             return
-        
+
         children = proc.children(recursive=True)
         for child in children:
             try:
@@ -135,7 +145,7 @@ def kill_tree(pid, create_time):
             proc.terminate()
         except psutil.Error:
             pass
-        
+
         gone, alive = psutil.wait_procs(children + [proc], timeout=2.0)
         for p in alive:
             try:
@@ -144,6 +154,7 @@ def kill_tree(pid, create_time):
                 pass
     except psutil.Error:
         pass
+
 
 def kill_streams():
     if not SETTINGS["kill_streams_on_exit"]:
@@ -159,6 +170,7 @@ def kill_streams():
                 os.remove(STREAMS_FILE)
         except Exception:
             pass
+
 
 def cleanup_on_start():
     try:
@@ -219,13 +231,13 @@ def cleanup_on_start():
     except Exception:
         pass
 
+
 def open_recording(channel):
     """Open the growing recording of a live channel in a second player, giving a
     seekable DVR view. Returns True if a player was spawned."""
     with _lock:
         entry = next(
-            (e for e in _open_streams
-             if e["channel"] == channel and e.get("record_path")),
+            (e for e in _open_streams if e["channel"] == channel and e.get("record_path")),
             None,
         )
     if not entry:
@@ -247,13 +259,14 @@ def open_recording(channel):
     except Exception:
         return False
 
+
 def install_exit_handlers():
     atexit.register(kill_streams)
-    
+
     def sig_handler(signum, frame):
         kill_streams()
         sys.exit(0)
-        
+
     try:
         signal.signal(signal.SIGTERM, sig_handler)
         if sys.platform != "win32":
@@ -264,13 +277,13 @@ def install_exit_handlers():
     if sys.platform == "win32":
         global _handler_routine
         WINFUNCTYPE = ctypes.WINFUNCTYPE(ctypes.c_bool, ctypes.c_uint)
-        
+
         def handler(event):
             if event in (2, 5, 6):
                 kill_streams()
                 return False
             return False
-            
+
         _handler_routine = WINFUNCTYPE(handler)
         try:
             ctypes.windll.kernel32.SetConsoleCtrlHandler(_handler_routine, True)

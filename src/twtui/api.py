@@ -4,6 +4,7 @@ The anonymous client-id serves single pages fine but cursor pagination (`after`)
 fails an integrity check, so lists load one large page (~100) rather than
 lazy-loading more on scroll. searchFor is capped at ~10 results by Twitch.
 """
+
 from concurrent.futures import ThreadPoolExecutor
 
 import requests
@@ -73,8 +74,10 @@ query($name: String!, $n: Int!) {
 
 def _gql(query, variables):
     return requests.post(
-        GQL_URL, headers={"Client-Id": GQL_CLIENT_ID},
-        json={"query": query, "variables": variables}, timeout=10,
+        GQL_URL,
+        headers={"Client-Id": GQL_CLIENT_ID},
+        json={"query": query, "variables": variables},
+        timeout=10,
     ).json()
 
 
@@ -100,7 +103,7 @@ def _gql_live(logins):
 
 def get_status(channels):
     # Chunk under the per-query login cap; run chunks in parallel.
-    chunks = [channels[i:i + 90] for i in range(0, len(channels), 90)]
+    chunks = [channels[i : i + 90] for i in range(0, len(channels), 90)]
     meta = {}
     with ThreadPoolExecutor(max_workers=max(len(chunks), 1)) as pool:
         for part in pool.map(_gql_live, chunks):
@@ -122,13 +125,15 @@ def twitch_search(query, limit=15):
         if not login:
             continue
         s = it.get("stream")
-        out.append({
-            "login": login,
-            "display": it.get("displayName") or login,
-            "live": bool(s),
-            "viewers": (s or {}).get("viewersCount") or 0,
-            "game": ((s or {}).get("game") or {}).get("displayName") or "",
-        })
+        out.append(
+            {
+                "login": login,
+                "display": it.get("displayName") or login,
+                "live": bool(s),
+                "viewers": (s or {}).get("viewersCount") or 0,
+                "game": ((s or {}).get("game") or {}).get("displayName") or "",
+            }
+        )
     out.sort(key=lambda x: not x["live"])  # stable: live first, relevance kept
     return out
 
@@ -145,8 +150,13 @@ def top_games(limit=100):
         name = n.get("name") or n.get("displayName")
         if not name:
             continue
-        out.append({"name": name, "display": n.get("displayName") or name,
-                    "viewers": n.get("viewersCount") or 0})
+        out.append(
+            {
+                "name": name,
+                "display": n.get("displayName") or name,
+                "viewers": n.get("viewersCount") or 0,
+            }
+        )
     return out
 
 
@@ -162,15 +172,22 @@ def search_games(query, limit=15):
         name = it.get("name")
         if not name:
             continue
-        out.append({"name": name, "display": it.get("displayName") or name,
-                    "viewers": it.get("viewersCount") or 0})
+        out.append(
+            {
+                "name": name,
+                "display": it.get("displayName") or name,
+                "viewers": it.get("viewersCount") or 0,
+            }
+        )
     return out
 
 
 def game_streams(name, limit=100):
     # Top live channels in a category, ordered by viewers (Twitch default).
     try:
-        edges = _gql(GAME_STREAMS_QUERY, {"name": name, "n": limit})["data"]["game"]["streams"]["edges"]
+        edges = _gql(GAME_STREAMS_QUERY, {"name": name, "n": limit})["data"]["game"]["streams"][
+            "edges"
+        ]
     except Exception:
         return []
     out = []
@@ -180,11 +197,13 @@ def game_streams(name, limit=100):
         login = b.get("login")
         if not login:
             continue
-        out.append({
-            "login": login,
-            "display": b.get("displayName") or login,
-            "live": True,
-            "viewers": n.get("viewersCount") or 0,
-            "game": (n.get("game") or {}).get("displayName") or "",
-        })
+        out.append(
+            {
+                "login": login,
+                "display": b.get("displayName") or login,
+                "live": True,
+                "viewers": n.get("viewersCount") or 0,
+                "game": (n.get("game") or {}).get("displayName") or "",
+            }
+        )
     return out

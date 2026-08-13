@@ -1,48 +1,80 @@
 """Application: stream launch + main input loop."""
+
 import threading
 import time
 
 from rich.live import Live
 
 from twtui.api import (
-    OFFLINE, get_status, twitch_search, top_games, search_games, game_streams,
+    OFFLINE,
+    game_streams,
+    get_status,
+    search_games,
+    top_games,
+    twitch_search,
 )
-from twtui.keys import read_key, term_setup, term_restore, _hotkey, SPECIAL, FOLD
 from twtui.config import (
-    SETTINGS, SETTINGS_SCHEMA,
-    load_config, save_config, set_run_on_startup, load_channels, save_channels,
-    rebuild_theme, rebuild_keybinds, apply_preset, vod_target,
+    SETTINGS,
+    SETTINGS_SCHEMA,
+    apply_preset,
+    load_channels,
+    load_config,
+    rebuild_keybinds,
+    rebuild_theme,
+    save_channels,
+    save_config,
+    set_run_on_startup,
+    vod_target,
+)
+from twtui.keymap import FOLD, SPECIAL
+from twtui.keys import _hotkey, read_key, term_restore, term_setup
+from twtui.streams import (
+    LAUNCH_GRACE,
+    cleanup_on_start,
+    install_exit_handlers,
+    launch,
+    open_recording,
+    stream_alive,
+    sync_state,
 )
 from twtui.ui import (
-    console, loading_panel, render, render_search, render_cats, render_cat,
-    render_settings, _filter_streams, render_confirm,
-)
-from twtui.streams import (
-    launch, sync_state, cleanup_on_start, install_exit_handlers,
-    stream_alive, LAUNCH_GRACE, open_recording,
+    _filter_streams,
+    console,
+    loading_panel,
+    render,
+    render_cat,
+    render_cats,
+    render_confirm,
+    render_search,
+    render_settings,
 )
 
 
 def sort_channels(channels, status):
-    channels.sort(key=lambda c: (not (status.get(c) or OFFLINE)["live"], -(status.get(c) or OFFLINE)["viewers"]))
+    channels.sort(
+        key=lambda c: (
+            not (status.get(c) or OFFLINE)["live"],
+            -(status.get(c) or OFFLINE)["viewers"],
+        )
+    )
 
 
 def main():
     load_config()
     install_exit_handlers()
     cleanup_on_start()
-    channels = load_channels()   # may be empty on a fresh install — that's fine,
-                                 # follow channels from the search view (tab / →)
+    channels = load_channels()  # may be empty on a fresh install — that's fine,
+    # follow channels from the search view (tab / →)
 
     status = {ch: False for ch in channels}
     opened = set()
-    followed = {c.lower() for c in channels}   # lowercased logins, kept in sync
+    followed = {c.lower() for c in channels}  # lowercased logins, kept in sync
     selected = 0
 
     # Shared state for the search modes + worker thread.
     st = {
-        "mode": "list",      # "list" | "search" | "cats" | "cat" | "settings"
-        "query": "",         # channel search
+        "mode": "list",  # "list" | "search" | "cats" | "cat" | "settings"
+        "query": "",  # channel search
         "set_section": 0,
         "set_sel": 0,
         "set_editing": False,
@@ -52,7 +84,7 @@ def main():
         "pick_sel": 0,
         "results": [],
         "sel": 0,
-        "gen": 0,            # bumped on every keystroke; stale replies are dropped
+        "gen": 0,  # bumped on every keystroke; stale replies are dropped
         "searching": False,
         # category search ("cats")
         "cat_query": "",
@@ -72,10 +104,14 @@ def main():
     lock = threading.Lock()
     typed = threading.Event()
 
-    with Live(loading_panel(), console=console, screen=True, auto_refresh=True, refresh_per_second=12) as live:
+    with Live(
+        loading_panel(), console=console, screen=True, auto_refresh=True, refresh_per_second=12
+    ) as live:
 
         def paint_list():
-            live.update(render(channels, status, selected, False, opened, st["failed"]), refresh=True)
+            live.update(
+                render(channels, status, selected, False, opened, st["failed"]), refresh=True
+            )
 
         def paint_settings():
             live.update(render_settings(st), refresh=True)
@@ -98,9 +134,12 @@ def main():
                     opened.discard(ch)
                     st["failed"][ch] = time.time()
                 m = st["mode"]
-                if m == "list": paint_list()
-                elif m == "search": paint_search()
-                elif m == "cat": paint_cat()
+                if m == "list":
+                    paint_list()
+                elif m == "search":
+                    paint_search()
+                elif m == "cat":
+                    paint_cat()
 
         def do_launch(ch, repaint):
             entry = launch(ch)
@@ -127,9 +166,9 @@ def main():
                 if not typed.is_set():
                     continue
                 typed.clear()
-                time.sleep(0.22)          # coalesce fast typing
+                time.sleep(0.22)  # coalesce fast typing
                 if typed.is_set():
-                    continue              # more keys arrived; reprocess
+                    continue  # more keys arrived; reprocess
                 with lock:
                     gen, mode = st["gen"], st["mode"]
                     q = st["cat_query"] if mode == "cats" else st["query"]
@@ -139,7 +178,11 @@ def main():
                         st["cat_searching"] = True
                     if st["mode"] == "cats":
                         paint_cats()
-                    res = search_games(q, SETTINGS["category_rows"]) if q.strip() else top_games(SETTINGS["category_rows"])
+                    res = (
+                        search_games(q, SETTINGS["category_rows"])
+                        if q.strip()
+                        else top_games(SETTINGS["category_rows"])
+                    )
                     with lock:
                         if gen != st["gen"]:
                             continue
@@ -161,7 +204,7 @@ def main():
                     paint_search()
                 res = twitch_search(q, SETTINGS["search_results"])
                 with lock:
-                    if gen != st["gen"]:   # a newer query is pending; drop this
+                    if gen != st["gen"]:  # a newer query is pending; drop this
                         continue
                     st["results"], st["sel"], st["searching"] = res, 0, False
                 if st["mode"] == "search":
@@ -197,8 +240,10 @@ def main():
                     if st["stop"] or SETTINGS["list_autorefresh_secs"] != secs:
                         break
                     time.sleep(0.1)
-                if st["stop"]: break
-                if st["mode"] != "list": continue
+                if st["stop"]:
+                    break
+                if st["mode"] != "list":
+                    continue
                 new_status = get_status(channels)
                 with lock:
                     cur = channels[selected] if 0 <= selected < len(channels) else None
@@ -243,8 +288,10 @@ def main():
                 channels.append(login)
                 followed.add(login.lower())
                 status[login] = {
-                    "live": res["live"], "viewers": res["viewers"],
-                    "game": res["game"], "display": res["display"],
+                    "live": res["live"],
+                    "viewers": res["viewers"],
+                    "game": res["game"],
+                    "display": res["display"],
                 }
             sort_channels(channels, status)
             selected = min(selected, max(len(channels) - 1, 0))
@@ -323,7 +370,7 @@ def main():
                         used = {SETTINGS[k] for k in SETTINGS if k.startswith("key_")}
                         if norm_char in used:
                             continue
-                        
+
                         fields = SETTINGS_SCHEMA[st["set_section"]][1]
                         key = fields[st["set_sel"]]["key"]
                         SETTINGS[key] = norm_char
@@ -333,7 +380,7 @@ def main():
                         st["set_capturing"] = False
                         paint_settings()
                         continue
-                        
+
                     if st["set_editing"]:
                         if tok == "ENTER":
                             fields = SETTINGS_SCHEMA[st["set_section"]][1]
@@ -368,7 +415,7 @@ def main():
                                 st["set_buf"] += char
                                 paint_settings()
                         continue
-                    
+
                     fields = SETTINGS_SCHEMA[st["set_section"]][1]
                     if tok in ("UP", "DOWN"):
                         delta = -1 if tok == "UP" else 1
@@ -392,7 +439,9 @@ def main():
                             paint_settings()
                         elif f["type"] in ("choice", "color", "preset"):
                             opts = f["choices"]
-                            st["pick_sel"] = opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
+                            st["pick_sel"] = (
+                                opts.index(SETTINGS[key]) if SETTINGS[key] in opts else 0
+                            )
                             st["set_picking"] = True
                             paint_settings()
                         elif f["type"] == "text":
@@ -434,7 +483,7 @@ def main():
                         paint_cat()
                     continue
 
-                if tok in ("LEFT", "RIGHT"):     # switch streamers/categories
+                if tok in ("LEFT", "RIGHT"):  # switch streamers/categories
                     if mode == "search":
                         open_categories()
                     elif mode == "cats":
@@ -442,7 +491,7 @@ def main():
                         paint_search()
                     continue
 
-                if tok == "TAB":                 # toggle list <-> search
+                if tok == "TAB":  # toggle list <-> search
                     if mode == "list":
                         st["mode"] = "search"
                         paint_search()
@@ -450,7 +499,6 @@ def main():
                         st["mode"] = "list"
                         paint_list()
                     continue
-
 
                 if mode == "cats":
                     if tok == "ENTER":
@@ -461,10 +509,14 @@ def main():
                             st["cat_ch_query"], st["cat_ch_sel"] = "", 0
                             st["cat_streams"], st["cat_searching"] = [], True
                             st["mode"] = "cat"
-                            paint_cat()                   # loading spinner
+                            paint_cat()  # loading spinner
                             streams = game_streams(g["name"], SETTINGS["streams_per_category"])
                             with lock:
-                                st["cat_streams"], st["cat_searching"], st["cat_ch_sel"] = streams, False, 0
+                                st["cat_streams"], st["cat_searching"], st["cat_ch_sel"] = (
+                                    streams,
+                                    False,
+                                    0,
+                                )
                             paint_cat()
                     elif tok == "ESC":
                         st["mode"] = "search"
@@ -551,7 +603,7 @@ def main():
                         break
                 else:
                     hot = _hotkey(char) if char else None
-                    if hot == "f":               # unfollow selected channel
+                    if hot == "f":  # unfollow selected channel
                         if channels:
                             removed = channels.pop(selected)
                             followed.discard(removed.lower())
@@ -560,10 +612,10 @@ def main():
                             if selected >= len(channels):
                                 selected = max(len(channels) - 1, 0)
                             paint_list()
-                    elif hot == "/":             # jump straight into search
+                    elif hot == "/":  # jump straight into search
                         st["mode"] = "search"
                         paint_search()
-                    elif hot == "s":             # settings
+                    elif hot == "s":  # settings
                         st["mode"] = "settings"
                         st["set_section"] = 0
                         st["set_sel"] = 0
@@ -584,9 +636,11 @@ def main():
                         request_quit()
                         if st["stop"]:
                             break
-                    elif char and char.lower() in ("d", "в"):   # open recording in 2nd player (seekable)
+                    elif char and char.lower() in (
+                        "d",
+                        "в",
+                    ):  # open recording in 2nd player (seekable)
                         if channels:
                             open_recording(channels[selected])
         finally:
             term_restore(term_state)
-

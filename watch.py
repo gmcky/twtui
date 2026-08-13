@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Entry shim so the app runs from a clone without installing (src layout)."""
+
 import os
 import sys
 

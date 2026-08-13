@@ -4,10 +4,11 @@ read_key() returns a normalised token: one of the SPECIAL names, a single
 printable character, or None to ignore. term_setup()/term_restore() put the
 POSIX terminal into cbreak mode around the loop (no-ops on Windows).
 """
+
 import os
 import sys
 
-from twtui.keymap import KEYBINDS, FOLD, SPECIAL, CTRL, WIN_ARROW, POSIX_SEQ
+from twtui.keymap import CTRL, FOLD, KEYBINDS, POSIX_SEQ, WIN_ARROW
 
 
 def _hotkey(ch):

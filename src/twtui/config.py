@@ -1,17 +1,20 @@
 """Settings and per-user file storage (channels.txt, config.json)."""
+
 import glob
 import json
 import os
 import re
-import sys
 import shlex
-from twtui.keymap import KEYBINDS
+import sys
 
+from twtui.keymap import KEYBINDS
 
 STREAMLINK = "streamlink"
 
 QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
 
+# hand-aligned table; keep the columns, don't let the formatter reflow it
+# fmt: off
 SETTINGS = {
     # Quick setup
     "preset": "Balanced",
@@ -63,26 +66,66 @@ SETTINGS = {
     # System
     "run_on_startup": False,
 }
+# fmt: on
 
-COLOR_CHOICES = ["magenta","cyan","green","yellow","red","blue","white",
-                 "bright_magenta","bright_cyan","bright_green","bright_blue",
-                 "bright_red","orange1","purple"]
-BG_CHOICES    = ["grey19","grey23","grey15","grey0","navy_blue","dark_red",
-                 "deep_pink4","grey35"]
+COLOR_CHOICES = [
+    "magenta",
+    "cyan",
+    "green",
+    "yellow",
+    "red",
+    "blue",
+    "white",
+    "bright_magenta",
+    "bright_cyan",
+    "bright_green",
+    "bright_blue",
+    "bright_red",
+    "orange1",
+    "purple",
+]
+BG_CHOICES = [
+    "grey19",
+    "grey23",
+    "grey15",
+    "grey0",
+    "navy_blue",
+    "dark_red",
+    "deep_pink4",
+    "grey35",
+]
 
-CODEC_CHOICES      = ["h264", "av1,h264", "h265,h264", "av1,h265,h264"]
+CODEC_CHOICES = ["h264", "av1,h264", "h265,h264", "av1,h265,h264"]
 RINGBUFFER_CHOICES = ["16M", "32M", "64M", "128M"]
-IPVER_CHOICES      = ["auto", "ipv4", "ipv6"]
+IPVER_CHOICES = ["auto", "ipv4", "ipv6"]
 
-PRESET_CHOICES = ["Custom", "Balanced", "Low latency", "High quality",
-                  "Data saver", "Unstable connection"]
+PRESET_CHOICES = [
+    "Custom",
+    "Balanced",
+    "Low latency",
+    "High quality",
+    "Data saver",
+    "Unstable connection",
+]
 
 # Keys a preset fully specifies. A preset is "active" when every one of these
 # equals the preset's fingerprint; otherwise the preset is "Custom".
-BUNDLE_KEYS = ["quality", "low_latency", "hls_live_edge", "twitch_codecs",
-               "retry_streams", "retry_max", "retry_open", "stream_timeout",
-               "ringbuffer_size", "segment_threads", "ip_version"]
+BUNDLE_KEYS = [
+    "quality",
+    "low_latency",
+    "hls_live_edge",
+    "twitch_codecs",
+    "retry_streams",
+    "retry_max",
+    "retry_open",
+    "stream_timeout",
+    "ringbuffer_size",
+    "segment_threads",
+    "ip_version",
+]
 
+# hand-aligned preset table; keep columns intact
+# fmt: off
 PRESETS = {
     "Balanced": {
         "quality":"best", "low_latency":True, "hls_live_edge":3, "twitch_codecs":"h264",
@@ -110,6 +153,8 @@ PRESETS = {
         "ringbuffer_size":"64M", "segment_threads":3, "ip_version":"auto",
     },
 }
+# fmt: on
+
 
 def apply_preset(name):
     """Overwrite the bundled settings with a named preset."""
@@ -128,6 +173,8 @@ def detect_preset():
     return "Custom"
 
 
+# hand-aligned schema table; the columns are intentional, keep them
+# fmt: off
 SETTINGS_SCHEMA = [
     ("Quick setup", [
         {"key":"preset", "type":"preset", "choices":PRESET_CHOICES,
@@ -189,6 +236,8 @@ SETTINGS_SCHEMA = [
         {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when Windows starts (Windows only)"},
     ]),
 ]
+# fmt: on
+
 
 def vod_target(query):
     """Return 'videos/<id>' if the query is a Twitch VOD reference, else None.
@@ -260,13 +309,15 @@ def build_stream_cmd(target):
     if not is_vod and s["dvr_restart"]:
         args += ["--hls-live-restart"]
     if s["record_streams"] and s["record_dir"].strip():
-        import os, time as _t
+        import os
+        import time as _t
+
         try:
             os.makedirs(s["record_dir"].strip(), exist_ok=True)
             safe = target.replace("/", "-")
             fname = f"{safe}-{_t.strftime('%Y%m%d-%H%M%S')}.ts"
             path = os.path.join(s["record_dir"].strip(), fname)
-            args += ["--record", path]   # --record plays live AND saves
+            args += ["--record", path]  # --record plays live AND saves
         except Exception:
             pass
 
@@ -287,6 +338,7 @@ else:
     APP_DIR = os.path.dirname(os.path.abspath(__file__))
 
 BAT_DIR = getattr(sys, "_MEIPASS", APP_DIR)
+
 
 def _config_dir():
     # Per-user writable config dir (source / frozen exe / pipx install).
@@ -309,21 +361,25 @@ CHANNELS_HEADER = "# One Twitch channel per line. Blank lines and #comments igno
 CONFIG_FILE = os.path.join(_config_dir(), "config.json")
 STREAMS_FILE = os.path.join(_config_dir(), "open_streams.json")
 
+
 def build_theme():
     return {
-        "accent":       SETTINGS["color_accent"],
-        "cursor":       SETTINGS["color_cursor"],
-        "live":         SETTINGS["color_live"],
-        "tab":          SETTINGS["color_tab"],
-        "open":         SETTINGS["color_open"],
+        "accent": SETTINGS["color_accent"],
+        "cursor": SETTINGS["color_cursor"],
+        "live": SETTINGS["color_live"],
+        "tab": SETTINGS["color_tab"],
+        "open": SETTINGS["color_open"],
         "highlight_bg": SETTINGS["color_highlight_bg"],
     }
 
+
 THEME = {}
+
 
 def rebuild_theme():
     THEME.clear()
     THEME.update(build_theme())
+
 
 def rebuild_keybinds():
     KEYBINDS["q"] = SETTINGS["key_quit"]
@@ -331,6 +387,7 @@ def rebuild_keybinds():
     KEYBINDS["f"] = SETTINGS["key_follow"]
     KEYBINDS["/"] = SETTINGS["key_search"]
     KEYBINDS["s"] = SETTINGS["key_settings"]
+
 
 def load_config():
     try:
@@ -350,7 +407,11 @@ def load_config():
                             SETTINGS[k] = val
                         elif f["type"] == "text" and isinstance(val, str):
                             SETTINGS[k] = val
-                        elif f["type"] == "int" and isinstance(val, int) and not isinstance(val, bool):
+                        elif (
+                            f["type"] == "int"
+                            and isinstance(val, int)
+                            and not isinstance(val, bool)
+                        ):
                             SETTINGS[k] = max(f["min"], min(f["max"], val))
                         elif f["type"] == "key" and isinstance(val, str) and len(val) == 1:
                             SETTINGS[k] = val
@@ -359,12 +420,14 @@ def load_config():
     rebuild_theme()
     rebuild_keybinds()
 
+
 def set_run_on_startup(enabled):
     """Add or remove the HKCU Run entry (Windows only). No-op elsewhere."""
     if sys.platform != "win32":
         return
     try:
         import winreg
+
         key = winreg.OpenKey(
             winreg.HKEY_CURRENT_USER,
             r"Software\Microsoft\Windows\CurrentVersion\Run",
@@ -396,6 +459,7 @@ def save_config():
     except Exception:
         pass
 
+
 def _read_channels(path):
     chans = []
     for line in open(path, encoding="utf-8"):
@@ -422,7 +486,7 @@ def load_channels():
             m = re.search(r"twitch\.tv/(\S+)", text)
             if m:
                 channels.append(m.group(1))
-    save_channels(channels)   # create the user file so follow/unfollow persist
+    save_channels(channels)  # create the user file so follow/unfollow persist
     return channels
 
 
@@ -432,6 +496,7 @@ def save_channels(channels):
         f.write(CHANNELS_HEADER)
         for c in channels:
             f.write(c + "\n")
+
 
 rebuild_theme()
 rebuild_keybinds()
