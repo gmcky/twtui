@@ -11,6 +11,12 @@ from twtui.keymap import KEYBINDS
 
 STREAMLINK = "streamlink"
 
+# Non-live features (DVR restart, recording, VOD browsing) are locked until the
+# native launcher lands — they conflict with live low-latency playback and add
+# large start delays. Code stays intact; only the entry points are gated. Flip
+# to False to re-enable. Clip playback is NOT gated.
+FEATURES_LOCKED = True
+
 QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
 
 # hand-aligned table; keep the columns, don't let the formatter reflow it
@@ -135,7 +141,7 @@ PRESETS = {
     "Low latency": {
         "quality":"best", "low_latency":True, "hls_live_edge":3, "twitch_codecs":"h264",
         "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
-        "ringbuffer_size":"16M", "segment_threads":2, "ip_version":"auto",
+        "ringbuffer_size":"16M", "segment_threads":1, "ip_version":"auto",
     },
     "High quality": {
         "quality":"best", "low_latency":False, "hls_live_edge":3, "twitch_codecs":"av1,h264",
@@ -157,12 +163,22 @@ PRESETS = {
 
 
 def apply_preset(name):
-    """Overwrite the bundled settings with a named preset."""
+    """Overwrite the bundled settings with a named preset.
+    'Custom' keeps current values but unlocks them for editing."""
+    if name == "Custom":
+        SETTINGS["preset"] = "Custom"
+        return
     bundle = PRESETS.get(name)
     if not bundle:
         return
     SETTINGS.update(bundle)
     SETTINGS["preset"] = name
+
+
+def is_locked(key):
+    """Bundled streamlink/network keys are read-only while a named preset is
+    active — pick the 'Custom' preset to edit them."""
+    return key in BUNDLE_KEYS and SETTINGS.get("preset", "Custom") != "Custom"
 
 
 def detect_preset():
@@ -176,10 +192,6 @@ def detect_preset():
 # hand-aligned schema table; the columns are intentional, keep them
 # fmt: off
 SETTINGS_SCHEMA = [
-    ("Quick setup", [
-        {"key":"preset", "type":"preset", "choices":PRESET_CHOICES,
-         "label":"Preset", "help":"one-pick bundle; editing any streamlink setting = Custom"},
-    ]),
     ("General", [
         {"key": "kill_streams_on_exit",     "type": "bool",   "label": "Kill streams on exit",        "help": "close all open streams when you quit"},
         {"key": "kill_orphans_on_start",    "type": "bool",   "label": "Kill ended streams on start", "help": "on launch, close players whose stream already ended"},
@@ -187,8 +199,9 @@ SETTINGS_SCHEMA = [
         {"key": "confirm_before_quit",      "type": "bool",   "label": "Confirm before quit",         "help": "ask before quitting if streams are open"},
     ]),
     ("Streamlink", [
+        {"key":"preset",        "type":"preset","choices":PRESET_CHOICES,  "label":"Preset",         "help":"bundle; locks the settings below (pick Custom to edit)"},
         {"key":"quality",       "type":"choice","choices":QUALITY_CHOICES,"label":"Quality",       "help":"stream quality passed to streamlink"},
-        {"key":"low_latency",   "type":"bool",  "label":"Low latency",    "help":"--twitch-low-latency (nearer live edge, manages edge itself)"},
+        {"key":"low_latency",   "type":"bool",  "label":"Low latency",    "help":"--twitch-low-latency + forces edge=1 (start at live)"},
         {"key":"twitch_codecs", "type":"choice","choices":CODEC_CHOICES,  "label":"Codecs",         "help":"--twitch-supported-codecs preference order"},
         {"key":"hls_live_edge", "type":"int","min":1,"max":6,"step":1,     "label":"Live edge",      "help":"segments behind live (ignored when low latency on)"},
         {"key":"player_path",   "type":"text",  "label":"Player path",    "help":"custom player exe (blank = streamlink default)"},
@@ -238,6 +251,11 @@ SETTINGS_SCHEMA = [
 ]
 # fmt: on
 
+# Hide the Recording section (record + DVR restart) while non-live features are
+# locked, so it can't be toggled back on from the settings UI.
+if FEATURES_LOCKED:
+    SETTINGS_SCHEMA = [sec for sec in SETTINGS_SCHEMA if sec[0] != "Recording"]
+
 
 def vod_target(query):
     """Return 'videos/<id>' if the query is a Twitch VOD reference, else None.
@@ -275,6 +293,15 @@ def _safe_filename(name):
     return out or "stream"
 
 
+def _is_vlc(player_path):
+    """VLC low-latency player-args only apply to VLC. Empty path = streamlink
+    auto-detect, which on the target setup resolves to VLC; a set path must name
+    vlc so we don't hand VLC flags to mpv/mpc."""
+    if not player_path:
+        return True
+    return "vlc" in os.path.basename(player_path).lower()
+
+
 def build_stream_cmd(target):
     """target = a channel login, or a VOD ("videos/<id>" or a full twitch URL)."""
     s = SETTINGS
@@ -290,11 +317,12 @@ def build_stream_cmd(target):
 
     args = [STREAMLINK, url, s["quality"]]
 
-    # Latency: low_latency manages its own live edge; only pass a manual
-    # --hls-live-edge when low_latency is OFF.
+    # Latency: --twitch-low-latency only enables LL-part prefetch, it does NOT
+    # move the start point. Without forcing edge=1 streamlink starts ~3 segments
+    # behind live, adding 20-30s of delay. Old builds passed edge=1 here — keep it.
     if not is_static:
         if s["low_latency"]:
-            args += ["--twitch-low-latency"]
+            args += ["--twitch-low-latency", "--hls-live-edge", "1"]
         else:
             args += ["--hls-live-edge", str(s["hls_live_edge"])]
 
@@ -303,10 +331,23 @@ def build_stream_cmd(target):
         args += ["--twitch-supported-codecs", s["twitch_codecs"]]
 
     # Player.
-    if s["player_path"].strip():
-        args += ["--player", s["player_path"].strip()]
-    if s["player_args"].strip():
-        args += ["--player-args", s["player_args"].strip()]
+    player = s["player_path"].strip()
+    if player:
+        args += ["--player", player]
+    user_pargs = s["player_args"].strip()
+    if user_pargs:
+        args += ["--player-args", user_pargs]
+    elif not is_static and s["low_latency"] and _is_vlc(player):
+        # --twitch-low-latency feeds VLC at the live edge, but VLC stacks its own
+        # ~1-1.5s network/live cache on top, and once it buffers on any hiccup it
+        # never seeks forward — the lag only accumulates (seen: ~30s behind).
+        # Cut VLC's caches so playback tracks the edge. Injected only for VLC and
+        # only when the user hasn't supplied their own --player-args.
+        args += [
+            "--player-args",
+            "--network-caching=500 --live-caching=500 "
+            "--sout-mux-caching=500 --clock-jitter=0 --clock-synchro=0",
+        ]
 
     # Reliability. Each 0/default value means "omit the flag".
     if not is_static:
@@ -332,9 +373,13 @@ def build_stream_cmd(target):
     elif s["ip_version"] == "ipv6":
         args += ["--ipv6"]
 
-    if not is_static and s["dvr_restart"]:
+    # --hls-live-restart rewinds to the OLDEST segment in the DVR window, which
+    # directly contradicts low-latency (start at the live edge). With both on,
+    # restart wins and silently adds the whole window as lag (~20-200s). Honor
+    # it only when low latency is off.
+    if not FEATURES_LOCKED and not is_static and s["dvr_restart"] and not s["low_latency"]:
         args += ["--hls-live-restart"]
-    if s["record_streams"] and s["record_dir"].strip():
+    if not FEATURES_LOCKED and s["record_streams"] and s["record_dir"].strip():
         import os
         import time as _t
 
@@ -441,8 +486,9 @@ def load_config():
                             SETTINGS[k] = max(f["min"], min(f["max"], val))
                         elif f["type"] == "key" and isinstance(val, str) and len(val) == 1:
                             SETTINGS[k] = val
+                        elif f["type"] == "preset" and val in f.get("choices", []):
+                            SETTINGS[k] = val
                         break
-    SETTINGS["preset"] = detect_preset()
     rebuild_theme()
     rebuild_keybinds()
 
@@ -553,7 +599,8 @@ def _macos_startup(enabled, home):
 
 
 def save_config():
-    SETTINGS["preset"] = detect_preset()
+    # preset is an explicit user choice now (it locks the bundled keys), not a
+    # value derived from the settings — persist it as-is, don't recompute.
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(SETTINGS, f, indent=2)

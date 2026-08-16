@@ -6,10 +6,10 @@ def test_fresh_defaults(settings):
 
 
 def test_apply_preset(settings):
-    apply_preset("Low latency")
+    apply_preset("High quality")
     assert settings["segment_threads"] == 2
-    assert settings["preset"] == "Low latency"
-    assert detect_preset() == "Low latency"
+    assert settings["preset"] == "High quality"
+    assert detect_preset() == "High quality"
 
 
 def test_preset_modification(settings):
