@@ -15,10 +15,12 @@ from twtui.api import (
     twitch_search,
 )
 from twtui.config import (
+    FEATURES_LOCKED,
     SETTINGS,
     SETTINGS_SCHEMA,
     apply_preset,
     clip_target,
+    is_locked,
     load_channels,
     load_config,
     rebuild_keybinds,
@@ -465,6 +467,8 @@ def main():
                     elif tok == "ENTER" or char == " ":
                         f = fields[st["set_sel"]]
                         key = f["key"]
+                        if is_locked(key):
+                            continue  # bundled key: active preset locks it
                         if f["type"] == "bool":
                             SETTINGS[key] = not SETTINGS[key]
                             save_config()
@@ -628,7 +632,7 @@ def main():
                         paint_channel()
                     continue
 
-                if tok == "CTRL_V":
+                if tok == "CTRL_V" and not FEATURES_LOCKED:
                     if mode == "list" and channels:
                         ch = channels[selected]
                         meta = status.get(ch) or OFFLINE
@@ -643,7 +647,7 @@ def main():
 
                 if mode == "search":
                     if tok == "ENTER":
-                        vt = vod_target(st["query"])
+                        vt = None if FEATURES_LOCKED else vod_target(st["query"])
                         ct = clip_target(st["query"]) if not vt else None
                         if vt:
                             do_launch(vt, paint_search)
@@ -721,9 +725,8 @@ def main():
                         request_quit()
                         if st["stop"]:
                             break
-                    elif char and char.lower() in (
-                        "d",
-                        "в",
+                    elif (
+                        not FEATURES_LOCKED and char and char.lower() in ("d", "в")
                     ):  # open recording in 2nd player (seekable)
                         if channels:
                             open_recording(channels[selected])

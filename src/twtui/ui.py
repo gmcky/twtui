@@ -8,7 +8,7 @@ from rich.table import Table
 from rich.text import Text
 
 from twtui.api import OFFLINE
-from twtui.config import SETTINGS, SETTINGS_SCHEMA, THEME
+from twtui.config import FEATURES_LOCKED, SETTINGS, SETTINGS_SCHEMA, THEME, is_locked
 
 console = Console()
 
@@ -77,11 +77,12 @@ def render(channels, status, selected, checking, opened, failed):
             vertical="middle",
         )
     )
-    rec_hint = " · d rec" if SETTINGS.get("record_streams") else ""
+    rec_hint = " · d rec" if SETTINGS.get("record_streams") and not FEATURES_LOCKED else ""
+    vod_hint = "" if FEATURES_LOCKED else " · ctrl+v VODs"
     body = Panel(
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
-        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint} · ctrl+v VODs · tab search · s settings · q quit[/]",
+        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint}{vod_hint} · tab search · s settings · q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
     )
@@ -178,10 +179,11 @@ def render_search(st, opened, followed):
     query_text = Text.assemble(
         ("❱ ", f"bold {THEME['cursor']}"), (q, "white"), ("▉", THEME["cursor"])
     )
+    search_vod_hint = "" if FEATURES_LOCKED else " · ctrl+v VODs"
     search_panel = Panel(
         query_text,
         title=f"[bold {THEME['accent']}]search twitch[/]",
-        subtitle="[dim]type · ←/→ switch · ↑↓ move · enter watch · ctrl+v VODs · ctrl+f follow · esc list · ctrl+q quit[/]",
+        subtitle=f"[dim]type · ←/→ switch · ↑↓ move · enter watch{search_vod_hint} · ctrl+f follow · esc list · ctrl+q quit[/]",
         border_style=THEME["accent"],
         padding=(0, 1),
     )
@@ -406,6 +408,7 @@ def render_settings(st):
         is_sel = i == st["set_sel"]
         key = f["key"]
         val = SETTINGS.get(key, "")
+        locked = is_locked(key)
 
         cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
 
@@ -445,10 +448,17 @@ def render_settings(st):
             else:
                 val_col.append(str(val), style="white")
 
+        # A named preset owns the bundled keys: show them read-only (dim, no
+        # arrows) so it's obvious they can't be edited until you pick Custom.
+        if locked:
+            val_col = Text(val_col.plain.strip(), style="dim")
+
         name = Text(
             f" {f['label']} ", style=f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
         )
         name.append(f"  {f['help']}", style="dim")
+        if locked:
+            name.append("  · locked", style=f"dim {THEME['open']}")
 
         table.add_row(cursor, val_col, name)
 
