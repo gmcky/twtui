@@ -32,9 +32,7 @@ API key.
 
 ![Followed channels](docs/screenshots/followed.png)
 
-| Search | Categories |
-|---|---|
-| ![Search](docs/screenshots/search.png) | ![Categories](docs/screenshots/categories.png) |
+![Categories](docs/screenshots/categories.png)
 
 ## Features
 
