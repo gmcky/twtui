@@ -113,6 +113,15 @@ def sync_state():
                 except psutil.Error:
                     pass
 
+            # Player was spawned and has since gone (stream ended, or the window
+            # was closed) while streamlink lingers: reap streamlink so a hidden
+            # console (CREATE_NO_WINDOW) doesn't stay running headless with no way
+            # to close it. Only when a player was actually recorded — a bare
+            # streamlink with no child yet may be retry_streams waiting for live.
+            if slink_alive and entry["player_pid"] is not None and not player_alive:
+                kill_tree(entry["slink_pid"], entry["slink_create"])
+                slink_alive = False
+
             if slink_alive or player_alive:
                 to_keep.append(entry)
 
