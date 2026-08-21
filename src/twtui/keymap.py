@@ -46,6 +46,8 @@ FOLD = {
     "б": ",",
     "ю": ".",
     "ё": "`",
+    # Physical /? key: Cyrillic layout emits '.', so fold it back for search.
+    ".": "/",
 }
 
 # Normalised special-key tokens returned by read_key().

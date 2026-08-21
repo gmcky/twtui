@@ -14,6 +14,7 @@ def test_fold_cyrillic_positions():
 def test_fold_latin_and_case():
     assert fold("Q") == "q"
     assert fold("/") == "/"
+    assert fold(".") == "/"  # Cyrillic /? key emits '.', folds to search
 
 
 def test_fold_rejects_non_single():
