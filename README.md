@@ -55,7 +55,7 @@ It began as a stream launcher and is growing into a full terminal Twitch client
 - **Configurable** theme colors, list auto-refresh, result counts, and hotkeys.
   Hotkeys work on any keyboard layout and are rebindable.
 - **Session hygiene**: optional kill-streams-on-exit, startup cleanup of dead
-  players, confirm-before-quit, and run-on-startup (Windows, macOS, Linux).
+  players, and confirm-before-quit.
 
 ## Install
 

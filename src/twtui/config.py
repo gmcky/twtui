@@ -245,10 +245,12 @@ SETTINGS_SCHEMA = [
 ]
 # fmt: on
 
-# Hide the Recording section (record + DVR restart) while non-live features are
-# locked, so it can't be toggled back on from the settings UI.
+# Hide sections that don't belong in the current live-only build: Recording
+# (record + DVR restart, non-live features) and System (run-on-startup, which
+# only makes sense once twtui is a standalone launcher, not a terminal app).
 if FEATURES_LOCKED:
-    SETTINGS_SCHEMA = [sec for sec in SETTINGS_SCHEMA if sec[0] != "Recording"]
+    _HIDDEN_SECTIONS = {"Recording", "System"}
+    SETTINGS_SCHEMA = [sec for sec in SETTINGS_SCHEMA if sec[0] not in _HIDDEN_SECTIONS]
 
 
 def vod_target(query):
