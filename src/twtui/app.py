@@ -38,6 +38,7 @@ from twtui.streams import (
     cleanup_on_start,
     install_exit_handlers,
     launch,
+    live_channels,
     open_recording,
     stream_alive,
     sync_state,
@@ -259,9 +260,22 @@ def main():
                 if not st["stop"]:
                     sync_state()
                     now = time.time()
+                    alive = live_channels()
                     with lock:
+                        # Drop the "open" tag for streams whose process died
+                        # (e.g. player closed by hand), not just grace failures.
+                        stale = opened - alive
+                        opened.difference_update(stale)
                         for c in [c for c, ts in st["failed"].items() if now - ts > 6]:
                             del st["failed"][c]
+                    if stale:
+                        m = st["mode"]
+                        if m == "list":
+                            paint_list()
+                        elif m == "search":
+                            paint_search()
+                        elif m == "cat":
+                            paint_cat()
 
         sync_th = threading.Thread(target=sync_worker, daemon=True)
         sync_th.start()

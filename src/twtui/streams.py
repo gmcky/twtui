@@ -129,6 +129,13 @@ def sync_state():
             _write_state(to_keep)
 
 
+def live_channels():
+    # Channels backed by a still-running process. Reflects reality after the
+    # last sync_state(), so a manually-closed player drops out on its own.
+    with _lock:
+        return {entry["channel"] for entry in _open_streams}
+
+
 def kill_tree(pid, create_time):
     try:
         proc = psutil.Process(pid)
