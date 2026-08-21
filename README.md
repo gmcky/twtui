@@ -44,7 +44,11 @@ It began as a stream launcher and is growing into a full terminal Twitch client
 - **Categories**: browse top games and the top channels within one.
 - **Follow / unfollow** from anywhere; the list is saved per user to a plain text file.
 - **One-key launch** into mpv or VLC. A stream that dies on launch is marked
-  `✗ failed` instead of pretending to be open.
+  `✗ failed` instead of pretending to be open. Opening a channel that is already
+  playing raises its window to the front instead of spawning a duplicate (Windows).
+- **Live open tracking**: the `▶ open` tag follows the real player process, clears
+  when you close it, and shows streams left running from a previous session on
+  startup.
 - **Clips**: paste a clip link into search and it opens, fully seekable.
 - **Quality presets** (Low latency, High quality, Data saver, Unstable connection)
   set a whole bundle of streamlink options in one pick; change any setting and the
@@ -53,7 +57,7 @@ It began as a stream launcher and is growing into a full terminal Twitch client
   live edge, retries, timeout, buffer size, segment threads, proxy, IP version,
   player path and args. No flag strings to memorize.
 - **Configurable** theme colors, list auto-refresh, result counts, and hotkeys.
-  Hotkeys work on any keyboard layout and are rebindable.
+  Hotkeys match the physical key on any layout (Cyrillic included) and are rebindable.
 - **Session hygiene**: optional kill-streams-on-exit, startup cleanup of dead
   players, and confirm-before-quit.
 
