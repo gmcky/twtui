@@ -3,9 +3,8 @@
 # List-mode single-key hotkeys.
 KEYBINDS = {"q": "q", "r": "r", "f": "f", "/": "/", "s": "s"}
 
-# Cyrillic characters that sit under the latin hotkey keys -> that hotkey
-# (RU/UA layouts). Latin layouts already match by character, so only Cyrillic
-# needs folding.
+# Cyrillic characters that sit under the latin hotkey keys -> that hotkey.
+# Latin layouts already match by character, so only Cyrillic needs folding.
 FOLD = {"й": "q", "к": "r", "а": "f", "ы": "s"}
 
 # Normalised special-key tokens returned by read_key().
