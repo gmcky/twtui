@@ -15,12 +15,12 @@ from twtui.api import (
     twitch_search,
 )
 from twtui.config import (
+    BUNDLE_KEYS,
     FEATURES_LOCKED,
     SETTINGS,
     SETTINGS_SCHEMA,
     apply_preset,
     clip_target,
-    is_locked,
     load_channels,
     load_config,
     rebuild_keybinds,
@@ -28,6 +28,7 @@ from twtui.config import (
     save_channels,
     save_config,
     set_run_on_startup,
+    sync_preset_from_settings,
     vod_target,
 )
 from twtui.keymap import FOLD, SPECIAL
@@ -387,6 +388,8 @@ def main():
                                 apply_preset(opts[st["pick_sel"]])
                             else:
                                 SETTINGS[f["key"]] = opts[st["pick_sel"]]
+                                if f["key"] in BUNDLE_KEYS:
+                                    sync_preset_from_settings()
                             save_config()
                             rebuild_theme()
                             rebuild_keybinds()
@@ -432,6 +435,8 @@ def main():
                                 SETTINGS[key] = max(f["min"], min(f["max"], val))
                             else:
                                 SETTINGS[key] = st["set_buf"]
+                            if key in BUNDLE_KEYS:
+                                sync_preset_from_settings()
                             save_config()
                             rebuild_theme()
                             rebuild_keybinds()
@@ -467,10 +472,10 @@ def main():
                     elif tok == "ENTER" or char == " ":
                         f = fields[st["set_sel"]]
                         key = f["key"]
-                        if is_locked(key):
-                            continue  # bundled key: active preset locks it
                         if f["type"] == "bool":
                             SETTINGS[key] = not SETTINGS[key]
+                            if key in BUNDLE_KEYS:
+                                sync_preset_from_settings()
                             save_config()
                             if key == "run_on_startup":
                                 set_run_on_startup(SETTINGS[key])

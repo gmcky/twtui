@@ -42,9 +42,9 @@ API key.
 - Follow / unfollow from anywhere; the list is saved per user.
 - Open a stream in your player with one key; a launch that dies right away is
   flagged `✗ failed` instead of pretending to be open.
-- Quick presets (Balanced, Low latency, High quality, Data saver, Unstable
-  connection) set a whole bundle of streamlink options in one pick; edit any of
-  them and the preset shows as Custom.
+- Quick presets (Low latency, High quality, Data saver, Unstable connection)
+  set a whole bundle of streamlink options in one pick; edit any of them and the
+  preset shows as Custom.
 - Deep streamlink control without knowing the flags: quality, low-latency, codecs,
   live edge, player path/args, retries, timeout, buffer size, segment threads,
   proxy, IPv4/IPv6 - all as plain settings.

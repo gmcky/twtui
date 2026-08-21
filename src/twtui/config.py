@@ -23,7 +23,7 @@ QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
 # fmt: off
 SETTINGS = {
     # Quick setup
-    "preset": "Balanced",
+    "preset": "Low latency",
     # General
     "kill_streams_on_exit": False,
     "kill_orphans_on_start": False,
@@ -107,7 +107,6 @@ IPVER_CHOICES = ["auto", "ipv4", "ipv6"]
 
 PRESET_CHOICES = [
     "Custom",
-    "Balanced",
     "Low latency",
     "High quality",
     "Data saver",
@@ -133,11 +132,6 @@ BUNDLE_KEYS = [
 # hand-aligned preset table; keep columns intact
 # fmt: off
 PRESETS = {
-    "Balanced": {
-        "quality":"best", "low_latency":True, "hls_live_edge":3, "twitch_codecs":"h264",
-        "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
-        "ringbuffer_size":"16M", "segment_threads":1, "ip_version":"auto",
-    },
     "Low latency": {
         "quality":"best", "low_latency":True, "hls_live_edge":3, "twitch_codecs":"h264",
         "retry_streams":0, "retry_max":0, "retry_open":1, "stream_timeout":60,
@@ -164,7 +158,7 @@ PRESETS = {
 
 def apply_preset(name):
     """Overwrite the bundled settings with a named preset.
-    'Custom' keeps current values but unlocks them for editing."""
+    'Custom' just keeps current values."""
     if name == "Custom":
         SETTINGS["preset"] = "Custom"
         return
@@ -175,10 +169,10 @@ def apply_preset(name):
     SETTINGS["preset"] = name
 
 
-def is_locked(key):
-    """Bundled streamlink/network keys are read-only while a named preset is
-    active — pick the 'Custom' preset to edit them."""
-    return key in BUNDLE_KEYS and SETTINGS.get("preset", "Custom") != "Custom"
+def sync_preset_from_settings():
+    """Re-tag the preset after a bundled key was edited by hand: snaps to the
+    matching preset name, or 'Custom' once the values leave every preset."""
+    SETTINGS["preset"] = detect_preset()
 
 
 def detect_preset():
@@ -199,7 +193,7 @@ SETTINGS_SCHEMA = [
         {"key": "confirm_before_quit",      "type": "bool",   "label": "Confirm before quit",         "help": "ask before quitting if streams are open"},
     ]),
     ("Streamlink", [
-        {"key":"preset",        "type":"preset","choices":PRESET_CHOICES,  "label":"Preset",         "help":"bundle; locks the settings below (pick Custom to edit)"},
+        {"key":"preset",        "type":"preset","choices":PRESET_CHOICES,  "label":"Preset",         "help":"bundle; editing any setting below flips this to Custom"},
         {"key":"quality",       "type":"choice","choices":QUALITY_CHOICES,"label":"Quality",       "help":"stream quality passed to streamlink"},
         {"key":"low_latency",   "type":"bool",  "label":"Low latency",    "help":"--twitch-low-latency + forces edge=1 (start at live)"},
         {"key":"twitch_codecs", "type":"choice","choices":CODEC_CHOICES,  "label":"Codecs",         "help":"--twitch-supported-codecs preference order"},
@@ -599,8 +593,8 @@ def _macos_startup(enabled, home):
 
 
 def save_config():
-    # preset is an explicit user choice now (it locks the bundled keys), not a
-    # value derived from the settings — persist it as-is, don't recompute.
+    # preset is kept in sync on edit (see sync_preset_from_settings), so persist
+    # the stored tag as-is — don't recompute here.
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(SETTINGS, f, indent=2)

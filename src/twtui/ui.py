@@ -8,7 +8,7 @@ from rich.table import Table
 from rich.text import Text
 
 from twtui.api import OFFLINE
-from twtui.config import FEATURES_LOCKED, SETTINGS, SETTINGS_SCHEMA, THEME, is_locked
+from twtui.config import FEATURES_LOCKED, SETTINGS, SETTINGS_SCHEMA, THEME
 
 console = Console()
 
@@ -408,7 +408,6 @@ def render_settings(st):
         is_sel = i == st["set_sel"]
         key = f["key"]
         val = SETTINGS.get(key, "")
-        locked = is_locked(key)
 
         cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
 
@@ -448,17 +447,10 @@ def render_settings(st):
             else:
                 val_col.append(str(val), style="white")
 
-        # A named preset owns the bundled keys: show them read-only (dim, no
-        # arrows) so it's obvious they can't be edited until you pick Custom.
-        if locked:
-            val_col = Text(val_col.plain.strip(), style="dim")
-
         name = Text(
             f" {f['label']} ", style=f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
         )
         name.append(f"  {f['help']}", style="dim")
-        if locked:
-            name.append("  · locked", style=f"dim {THEME['open']}")
 
         table.add_row(cursor, val_col, name)
 

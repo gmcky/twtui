@@ -1,8 +1,15 @@
-from twtui.config import BUNDLE_KEYS, PRESET_CHOICES, PRESETS, apply_preset, detect_preset
+from twtui.config import (
+    BUNDLE_KEYS,
+    PRESET_CHOICES,
+    PRESETS,
+    apply_preset,
+    detect_preset,
+    sync_preset_from_settings,
+)
 
 
 def test_fresh_defaults(settings):
-    assert detect_preset() == "Balanced"
+    assert detect_preset() == "Low latency"
 
 
 def test_apply_preset(settings):
@@ -13,9 +20,26 @@ def test_apply_preset(settings):
 
 
 def test_preset_modification(settings):
-    apply_preset("Balanced")
+    apply_preset("Low latency")
     settings["quality"] = "480p"
     assert detect_preset() == "Custom"
+
+
+def test_sync_flips_to_custom_on_edit(settings):
+    apply_preset("High quality")
+    settings["segment_threads"] = 8
+    sync_preset_from_settings()
+    assert settings["preset"] == "Custom"
+
+
+def test_sync_snaps_back_to_named_preset(settings):
+    apply_preset("High quality")
+    settings["quality"] = "480p"
+    sync_preset_from_settings()
+    assert settings["preset"] == "Custom"
+    settings["quality"] = "best"  # back to the High quality fingerprint
+    sync_preset_from_settings()
+    assert settings["preset"] == "High quality"
 
 
 def test_apply_custom(settings):
