@@ -5,7 +5,7 @@
 <h1 align="center">twtui</h1>
 
 <p align="center">
-  <strong>A terminal UI for watching Twitch.</strong>
+  <strong>Watch Twitch from your terminal.</strong>
 </p>
 
 <p align="center">
@@ -19,16 +19,19 @@
   <a href="#features">Features</a> •
   <a href="#install">Install</a> •
   <a href="#usage">Usage</a> •
-  <a href="#keys">Keys</a> •
+  <a href="#roadmap">Roadmap</a> •
   <a href="#notes">Notes</a>
 </p>
 
 ---
 
-See which of your followed Twitch channels are live, search all of Twitch, browse
-categories, and open any stream in your player without leaving the terminal.
-Streams launch through [streamlink](https://streamlink.github.io/). No login, no
-API key.
+twtui lists your followed Twitch channels, searches all of Twitch, and opens any
+live stream in mpv or VLC, all from the terminal: no browser, no login, no API
+key. streamlink does the resolving and launching; twtui is the fast,
+keyboard-driven front end around it.
+
+It began as a stream launcher and is growing into a full terminal Twitch client
+(VODs, clips, and an integrated chat overlay). See [Roadmap](#roadmap).
 
 ![Followed channels](docs/screenshots/followed.png)
 
@@ -36,32 +39,23 @@ API key.
 
 ## Features
 
-- Followed-channel list with live status, viewer count and current game.
-- Fuzzy search across all of Twitch (matches logins and display names, any language).
-- Browse top categories and the top channels within one.
-- Follow / unfollow from anywhere; the list is saved per user.
-- Open a stream in your player with one key; a launch that dies right away is
-  flagged `✗ failed` instead of pretending to be open.
-- Quick presets (Low latency, High quality, Data saver, Unstable connection)
-  set a whole bundle of streamlink options in one pick; edit any of them and the
-  preset shows as Custom.
-- Deep streamlink control without knowing the flags: quality, low-latency, codecs,
-  live edge, player path/args, retries, timeout, buffer size, segment threads,
-  proxy, IPv4/IPv6 - all as plain settings.
-- Watch VODs: type a `twitch.tv/videos/<id>`, a bare id, or `videos/<id>` in search
-  and open the past broadcast with a fully seekable timeline.
-- Browse a channel's past broadcasts: `Ctrl+V` on any channel (followed list or a
-  search result) opens its recent VODs (title, date, length, views) to pick and watch.
-- Watch clips: paste a `clips.twitch.tv/<slug>` or `twitch.tv/<chan>/clip/<slug>`
-  link in search and it opens the clip, fully seekable.
-- Record / DVR: write the live stream to a `.ts` while watching; `d` opens the
-  growing file in a second player so you can seek backward. `--hls-live-restart`
-  optionally starts nearer the beginning of the available window.
-- Settings screen (saved to config.json), organized in sections: Quick setup,
-  General, Streamlink, Network, Recording, Appearance (theme colors), Lists
-  (auto-refresh, result counts), Hotkeys (rebindable), System (kill-on-exit,
-  confirm-before-quit, startup cleanup, run-on-startup on Windows, macOS and Linux).
-- Hotkeys work on any keyboard layout and can be rebound.
+- **Followed channels** at a glance: live status, viewer count, current category.
+- **Search all of Twitch** by login or display name, in any language.
+- **Categories**: browse top games and the top channels within one.
+- **Follow / unfollow** from anywhere; the list is saved per user to a plain text file.
+- **One-key launch** into mpv or VLC. A stream that dies on launch is marked
+  `✗ failed` instead of pretending to be open.
+- **Clips**: paste a clip link into search and it opens, fully seekable.
+- **Quality presets** (Low latency, High quality, Data saver, Unstable connection)
+  set a whole bundle of streamlink options in one pick; change any setting and the
+  preset becomes Custom.
+- **Full streamlink control as plain settings**: quality, low-latency, codecs,
+  live edge, retries, timeout, buffer size, segment threads, proxy, IP version,
+  player path and args. No flag strings to memorize.
+- **Configurable** theme colors, list auto-refresh, result counts, and hotkeys.
+  Hotkeys work on any keyboard layout and are rebindable.
+- **Session hygiene**: optional kill-streams-on-exit, startup cleanup of dead
+  players, confirm-before-quit, and run-on-startup (Windows, macOS, Linux).
 
 ## Install
 
@@ -83,50 +77,38 @@ python -m twtui.app
 
 ## Usage
 
-- The app opens on your followed list. Add channels by following them from search
-  (see keys below), or edit `channels.txt` in your config dir:
+The app opens on your followed list. Move with the arrow keys, `Enter` to watch the
+selected channel, `s` for settings. The in-app footer shows the current keys, and
+every hotkey is rebindable in settings.
+
+- **Follow channels** from search, or edit `channels.txt` in your config dir:
   - Windows: `%APPDATA%\twitch-tui\channels.txt`
   - Linux: `~/.config/twitch-tui/channels.txt`
   - macOS: `~/Library/Application Support/twitch-tui/channels.txt`
-- `Enter` on a channel opens it in your player.
-- To watch a past broadcast, open search (`Tab`) and type a VOD reference -
-  `twitch.tv/videos/123456789`, `videos/123456789`, or just the numeric id - then
-  `Enter`. VODs are fully seekable; live streams are not (Twitch only serves a short
-  live window).
-- To browse a channel's past broadcasts, press `Ctrl+V` on it (in the followed list
-  or on a search result). Pick a VOD from the list and `Enter` to watch it, fully
-  seekable. Type in that view to filter by title.
-- To watch a clip, open search (`Tab`) and paste a clip link
+- **Watch a clip**: open search, paste a clip link
   (`clips.twitch.tv/<slug>` or `twitch.tv/<chan>/clip/<slug>`), then `Enter`.
-- To record while watching, turn on Recording in settings and set a folder. `d` on
-  the followed list opens that recording in a second player with a seekable timeline.
 
-## Keys
+Settings persist to `config.json` in the same config dir.
 
-| Key | Action |
-|-----|--------|
-| `↑` `↓` | Move |
-| `Enter` | Watch selected |
-| `Tab` | Switch followed list ⇄ search |
-| `←` `→` | Switch Streamers / Categories (in search) |
-| `Ctrl+F` | Follow / unfollow (in search or a category) |
-| `Ctrl+V` | Browse the selected channel's past VODs (followed list or search) |
-| `f` | Unfollow (in the followed list) |
-| `r` | Refresh live status |
-| `d` | Open the selected channel's recording in a second player (when recording) |
-| `s` | Settings |
-| `Ctrl+Q` | Quit (from anywhere) |
-| `Esc` | Back / quit |
+## Roadmap
 
-The single-key list hotkeys (`f` `r` `s` `q` and search `/`) are rebindable in the
-settings screen.
+Working toward a full terminal Twitch client on top of the current launcher.
+
+- **VODs and clips**: browse a channel's past broadcasts and open VODs on a seekable
+  timeline. The groundwork exists in the codebase but is gated off in this build.
+- **Real DVR**: seekable live playback backed by an on-disk buffer, driving mpv as
+  the player instead of the current external-player launch.
+- **Chat overlay**: Twitch login (OAuth), 7TV / BetterTTV emotes, channel-point
+  auto-collect, drops, predictions, and moderator actions.
+- **More streamlink options** surfaced as friendly settings.
+- **Distribution**: `pipx install twtui` from PyPI, plus CI.
 
 ## Notes
 
 - Unofficial. It uses Twitch's public web GraphQL, not the official API, so it can
-  break if Twitch changes things. Search returns ~10 results and lists load one
-  page (row counts are configurable in settings, but Twitch caps search server
-  side); deeper cursor paging needs a signed token and is not implemented.
+  break when Twitch changes things. Search returns ~10 results and lists load a
+  single page (row counts are configurable, but Twitch caps search server-side);
+  deeper paging needs a signed token and is not implemented.
 - Not affiliated with Twitch.
 
 ## License
