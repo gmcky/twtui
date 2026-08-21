@@ -69,12 +69,12 @@ def sort_channels(channels, status):
 def main():
     load_config()
     install_exit_handlers()
-    cleanup_on_start()
+    still_open = cleanup_on_start()
     channels = load_channels()  # may be empty on a fresh install — that's fine,
     # follow channels from the search view (tab / →)
 
     status = {ch: False for ch in channels}
-    opened = set()
+    opened = set(still_open)  # streams from a previous session, still running
     followed = {c.lower() for c in channels}  # lowercased logins, kept in sync
     selected = 0
 

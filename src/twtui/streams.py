@@ -182,7 +182,7 @@ def kill_streams():
 def cleanup_on_start():
     try:
         if not os.path.exists(STREAMS_FILE):
-            return
+            return set()
         with open(STREAMS_FILE, "r", encoding="utf-8") as f:
             prev = json.load(f)
         if not isinstance(prev, list):
@@ -193,6 +193,7 @@ def cleanup_on_start():
     kill_all = SETTINGS.get("kill_all_streams_on_start", False)
     kill_orphans = SETTINGS.get("kill_orphans_on_start", False)
 
+    survivors = []
     for entry in prev:
         slink_pid = entry.get("slink_pid")
         slink_create = entry.get("slink_create")
@@ -227,16 +228,30 @@ def cleanup_on_start():
                         kill_tree(player_pid, player_create)
                 except psutil.Error:
                     pass
-        elif kill_orphans:
-            if (not slink_alive) and player_alive:
-                if player_pid is not None:
-                    kill_tree(player_pid, player_create)
+            continue
+        if kill_orphans and (not slink_alive) and player_alive:
+            if player_pid is not None:
+                kill_tree(player_pid, player_create)
+            continue
+        # Still running from a previous session: keep tracking it so the list
+        # shows it as open on startup and sync_state() reaps it when it dies.
+        if slink_alive or player_alive:
+            survivors.append(entry)
 
-    try:
-        if os.path.exists(STREAMS_FILE):
-            os.remove(STREAMS_FILE)
-    except Exception:
-        pass
+    with _lock:
+        _open_streams.clear()
+        _open_streams.extend(survivors)
+
+    if survivors:
+        _write_state(survivors)
+    else:
+        try:
+            if os.path.exists(STREAMS_FILE):
+                os.remove(STREAMS_FILE)
+        except Exception:
+            pass
+
+    return {e["channel"] for e in survivors}
 
 
 def open_recording(channel):
