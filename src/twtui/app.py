@@ -121,25 +121,38 @@ def main():
     with Live(
         loading_panel(), console=console, screen=True, auto_refresh=True, refresh_per_second=12
     ) as live:
-
+        # The quit-confirm modal must stay on top: background workers keep
+        # painting the underlying view, so every painter yields to it here.
         def paint_list():
+            if st.get("confirm_quit"):
+                return
             live.update(
                 render(channels, status, selected, False, opened, st["failed"]), refresh=True
             )
 
         def paint_settings():
+            if st.get("confirm_quit"):
+                return
             live.update(render_settings(st), refresh=True)
 
         def paint_search():
+            if st.get("confirm_quit"):
+                return
             live.update(render_search(st, opened, followed), refresh=True)
 
         def paint_cats():
+            if st.get("confirm_quit"):
+                return
             live.update(render_cats(st), refresh=True)
 
         def paint_cat():
+            if st.get("confirm_quit"):
+                return
             live.update(render_cat(st, opened, followed), refresh=True)
 
         def paint_channel():
+            if st.get("confirm_quit"):
+                return
             live.update(render_channel(st), refresh=True)
 
         def open_channel(login, display, back_mode):
