@@ -8,18 +8,7 @@ POSIX terminal into cbreak mode around the loop (no-ops on Windows).
 import os
 import sys
 
-from twtui.keymap import CTRL, FOLD, KEYBINDS, POSIX_SEQ, WIN_ARROW
-
-
-def _hotkey(ch):
-    if not ch:
-        return None
-    low = ch.lower()
-    norm = FOLD.get(low, low)
-    rev = {bound: action for action, bound in KEYBINDS.items()}
-    if norm in rev:
-        return rev[norm]
-    return None
+from twtui.keymap import CTRL, POSIX_SEQ, WIN_ARROW
 
 
 def _norm(ch):

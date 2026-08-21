@@ -31,8 +31,8 @@ from twtui.config import (
     sync_preset_from_settings,
     vod_target,
 )
-from twtui.keymap import FOLD, SPECIAL
-from twtui.keys import _hotkey, read_key, term_restore, term_setup
+from twtui.keymap import SPECIAL, action_of, fold
+from twtui.keys import read_key, term_restore, term_setup
 from twtui.streams import (
     LAUNCH_GRACE,
     cleanup_on_start,
@@ -369,11 +369,12 @@ def main():
                     continue
 
                 if st.get("confirm_quit"):
-                    if tok in ("y", "й", "ENTER"):
+                    k = fold(tok)  # layout-agnostic y/n
+                    if tok == "ENTER" or k == "y":
                         st["stop"] = True
                         typed.set()
                         break
-                    elif tok in ("n", "ESC"):
+                    elif tok == "ESC" or k == "n":
                         st["confirm_quit"] = False
                         mode = st["mode"]
                         if mode == "list":
@@ -434,7 +435,7 @@ def main():
                             continue
                         if tok in SPECIAL or char is None or len(char) != 1:
                             continue
-                        norm_char = FOLD.get(char.lower(), char.lower())
+                        norm_char = fold(char)
                         used = {SETTINGS[k] for k in SETTINGS if k.startswith("key_")}
                         if norm_char in used:
                             continue
@@ -723,7 +724,7 @@ def main():
                     if st["stop"]:
                         break
                 else:
-                    hot = _hotkey(char) if char else None
+                    hot = action_of(char)
                     if hot == "f":  # unfollow selected channel
                         if channels:
                             removed = channels.pop(selected)
