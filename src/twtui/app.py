@@ -36,6 +36,7 @@ from twtui.keys import read_key, term_restore, term_setup
 from twtui.streams import (
     LAUNCH_GRACE,
     cleanup_on_start,
+    focus_channel,
     install_exit_handlers,
     launch,
     live_channels,
@@ -193,6 +194,10 @@ def main():
                     paint_cat()
 
         def do_launch(ch, repaint):
+            # Already open: focus its window instead of spawning a duplicate.
+            # Focus failing (window gone, or non-Windows) falls through to relaunch.
+            if ch in opened and focus_channel(ch):
+                return
             entry = launch(ch)
             opened.add(ch)
             st["failed"].pop(ch, None)

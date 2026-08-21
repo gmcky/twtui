@@ -136,6 +136,62 @@ def live_channels():
         return {entry["channel"] for entry in _open_streams}
 
 
+def _focus_windows(pids):
+    from ctypes import wintypes
+
+    user32 = ctypes.windll.user32
+    hit = []
+
+    @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
+    def cb(hwnd, _lparam):
+        if not user32.IsWindowVisible(hwnd):
+            return True
+        pid = wintypes.DWORD()
+        user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
+        if pid.value in pids:
+            # Only restore a minimized window; SW_RESTORE on a fullscreen
+            # player would drop it out of fullscreen.
+            if user32.IsIconic(hwnd):
+                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
+            user32.SetForegroundWindow(hwnd)
+            hit.append(hwnd)
+            return False  # stop enumerating
+        return True
+
+    user32.EnumWindows(cb, 0)
+    return bool(hit)
+
+
+def focus_channel(channel):
+    """Bring an already-open channel's player window to the foreground.
+    Returns True if a window was focused. Windows-only; no-op elsewhere so
+    other platforms fall back to relaunching."""
+    if sys.platform != "win32":
+        return False
+    with _lock:
+        entry = next((e for e in _open_streams if e["channel"] == channel), None)
+        if not entry:
+            return False
+        pids = set()
+        if entry.get("player_pid") is not None:
+            pids.add(entry["player_pid"])
+        slink_pid = entry.get("slink_pid")
+    # player_pid may not be recorded yet (sync runs on a timer); pull the live
+    # child of streamlink directly so a just-launched stream can still focus.
+    if slink_pid is not None:
+        try:
+            for child in psutil.Process(slink_pid).children(recursive=True):
+                pids.add(child.pid)
+        except psutil.Error:
+            pass
+    if not pids:
+        return False
+    try:
+        return _focus_windows(pids)
+    except Exception:
+        return False
+
+
 def kill_tree(pid, create_time):
     try:
         proc = psutil.Process(pid)
