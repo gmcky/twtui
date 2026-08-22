@@ -145,11 +145,18 @@ def live_channels():
         return {entry["channel"] for entry in _open_streams}
 
 
-def _focus_windows(pids):
+def _focus_windows(pids, activate=True):
     from ctypes import wintypes
 
     user32 = ctypes.windll.user32
     hit = []
+
+    HWND_TOP = 0
+    SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
+    SWP_NOACTIVATE = 0x0010
+    SW_RESTORE = 9
+    SW_SHOWNOACTIVATE = 4
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
     def cb(hwnd, _lparam):
@@ -158,11 +165,22 @@ def _focus_windows(pids):
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         if pid.value in pids:
-            # Only restore a minimized window; SW_RESTORE on a fullscreen
-            # player would drop it out of fullscreen.
-            if user32.IsIconic(hwnd):
-                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-            user32.SetForegroundWindow(hwnd)
+            # Only un-minimize a minimized window; restoring a fullscreen player
+            # would drop it out of fullscreen.
+            if activate:
+                if user32.IsIconic(hwnd):
+                    user32.ShowWindow(hwnd, SW_RESTORE)
+                user32.SetForegroundWindow(hwnd)
+            else:
+                # Raise to the top of the z-order WITHOUT activating, so the
+                # terminal keeps keyboard focus (multi-monitor quick-switch).
+                # SWP_NOACTIVATE + SW_SHOWNOACTIVATE are what keep focus put; this
+                # path also dodges the SetForegroundWindow focus-steal lock.
+                if user32.IsIconic(hwnd):
+                    user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+                user32.SetWindowPos(
+                    hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                )
             hit.append(hwnd)
             return False  # stop enumerating
         return True
@@ -196,7 +214,7 @@ def focus_channel(channel):
     if not pids:
         return False
     try:
-        return _focus_windows(pids)
+        return _focus_windows(pids, activate=not SETTINGS.get("keep_terminal_focus", False))
     except Exception:
         return False
 
