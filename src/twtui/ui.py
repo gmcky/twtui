@@ -132,7 +132,7 @@ def render_opened(chans, status, selected):
     return Panel(
         inner,
         title=_scroll_title("open streams", start, end, len(chans)),
-        subtitle="[dim]↑↓ move · enter switch · x close · esc back · ctrl+q quit[/]",
+        subtitle="[dim]↑↓ move · enter switch · x close · esc back · q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
     )

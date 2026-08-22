@@ -29,6 +29,7 @@ SETTINGS = {
     "kill_orphans_on_start": False,
     "kill_all_streams_on_start": False,
     "confirm_before_quit": False,
+    "keep_terminal_focus": False,  # raise stream window without stealing focus
     # Streamlink (playback)
     "quality": "best",
     "low_latency": True,
@@ -192,6 +193,7 @@ SETTINGS_SCHEMA = [
         {"key": "kill_orphans_on_start",    "type": "bool",   "label": "Kill ended streams on start", "help": "on launch, close players whose stream already ended"},
         {"key": "kill_all_streams_on_start","type": "bool",   "label": "Kill all streams on start",   "help": "on launch, close every stream left from last session"},
         {"key": "confirm_before_quit",      "type": "bool",   "label": "Confirm before quit",         "help": "ask before quitting if streams are open"},
+        {"key": "keep_terminal_focus",      "type": "bool",   "label": "Keep terminal focus",         "help": "raise a stream window without stealing focus, so you keep controlling the terminal (Windows; good for multi-monitor)"},
     ]),
     ("Streamlink", [
         {"key":"preset",        "type":"preset","choices":PRESET_CHOICES,  "label":"Preset",         "help":"bundle; editing any setting below flips this to Custom"},

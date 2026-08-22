@@ -145,11 +145,31 @@ def live_channels():
         return {entry["channel"] for entry in _open_streams}
 
 
-def _focus_windows(pids):
+def _focus_windows(pids, activate=True):
     from ctypes import wintypes
 
     user32 = ctypes.windll.user32
     hit = []
+
+    # -1 / -2 as HWND handles; declare argtypes so the 64-bit handles aren't
+    # truncated to 32-bit ints by ctypes' default int marshalling.
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+    HWND_TOPMOST = wintypes.HWND(-1)
+    HWND_NOTOPMOST = wintypes.HWND(-2)
+    SWP_NOSIZE = 0x0001
+    SWP_NOMOVE = 0x0002
+    SWP_NOACTIVATE = 0x0010
+    SW_RESTORE = 9
+    SW_SHOWNOACTIVATE = 4
 
     @ctypes.WINFUNCTYPE(ctypes.c_bool, wintypes.HWND, wintypes.LPARAM)
     def cb(hwnd, _lparam):
@@ -158,11 +178,23 @@ def _focus_windows(pids):
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         if pid.value in pids:
-            # Only restore a minimized window; SW_RESTORE on a fullscreen
-            # player would drop it out of fullscreen.
-            if user32.IsIconic(hwnd):
-                user32.ShowWindow(hwnd, 9)  # SW_RESTORE
-            user32.SetForegroundWindow(hwnd)
+            # Only un-minimize a minimized window; restoring a fullscreen player
+            # would drop it out of fullscreen.
+            if activate:
+                if user32.IsIconic(hwnd):
+                    user32.ShowWindow(hwnd, SW_RESTORE)
+                user32.SetForegroundWindow(hwnd)
+            else:
+                # Raise ABOVE the active window without activating it, so the
+                # terminal keeps keyboard focus (multi-monitor quick-switch).
+                # HWND_TOP alone can't jump over the foreground window (same
+                # focus-steal lock), so briefly flag the window topmost then
+                # release it; SWP_NOACTIVATE keeps focus on the terminal.
+                if user32.IsIconic(hwnd):
+                    user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
+                flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags)
+                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags)
             hit.append(hwnd)
             return False  # stop enumerating
         return True
@@ -196,7 +228,7 @@ def focus_channel(channel):
     if not pids:
         return False
     try:
-        return _focus_windows(pids)
+        return _focus_windows(pids, activate=not SETTINGS.get("keep_terminal_focus", False))
     except Exception:
         return False
 
