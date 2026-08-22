@@ -712,6 +712,10 @@ def main():
                     elif tok == "ESC":
                         st["mode"] = "list"
                         paint_list()
+                    elif action_of(char) == "q":  # no input here, so plain q quits
+                        request_quit()
+                        if st["stop"]:
+                            break
                     elif fold(char) == "x":  # close the selected stream
                         if chans:
                             ch = chans[st["opened_sel"]]
