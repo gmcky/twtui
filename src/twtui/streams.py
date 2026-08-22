@@ -151,7 +151,20 @@ def _focus_windows(pids, activate=True):
     user32 = ctypes.windll.user32
     hit = []
 
-    HWND_TOP = 0
+    # -1 / -2 as HWND handles; declare argtypes so the 64-bit handles aren't
+    # truncated to 32-bit ints by ctypes' default int marshalling.
+    user32.SetWindowPos.argtypes = [
+        wintypes.HWND,
+        wintypes.HWND,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        ctypes.c_int,
+        wintypes.UINT,
+    ]
+    user32.SetWindowPos.restype = wintypes.BOOL
+    HWND_TOPMOST = wintypes.HWND(-1)
+    HWND_NOTOPMOST = wintypes.HWND(-2)
     SWP_NOSIZE = 0x0001
     SWP_NOMOVE = 0x0002
     SWP_NOACTIVATE = 0x0010
@@ -172,15 +185,16 @@ def _focus_windows(pids, activate=True):
                     user32.ShowWindow(hwnd, SW_RESTORE)
                 user32.SetForegroundWindow(hwnd)
             else:
-                # Raise to the top of the z-order WITHOUT activating, so the
+                # Raise ABOVE the active window without activating it, so the
                 # terminal keeps keyboard focus (multi-monitor quick-switch).
-                # SWP_NOACTIVATE + SW_SHOWNOACTIVATE are what keep focus put; this
-                # path also dodges the SetForegroundWindow focus-steal lock.
+                # HWND_TOP alone can't jump over the foreground window (same
+                # focus-steal lock), so briefly flag the window topmost then
+                # release it; SWP_NOACTIVATE keeps focus on the terminal.
                 if user32.IsIconic(hwnd):
                     user32.ShowWindow(hwnd, SW_SHOWNOACTIVATE)
-                user32.SetWindowPos(
-                    hwnd, HWND_TOP, 0, 0, 0, 0, SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
-                )
+                flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE
+                user32.SetWindowPos(hwnd, HWND_TOPMOST, 0, 0, 0, 0, flags)
+                user32.SetWindowPos(hwnd, HWND_NOTOPMOST, 0, 0, 0, 0, flags)
             hit.append(hwnd)
             return False  # stop enumerating
         return True
