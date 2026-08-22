@@ -1,4 +1,30 @@
-from twtui.ui import _filter_streams, _window
+import io
+
+from rich.console import Console
+
+from twtui.ui import _filter_streams, _window, render_opened
+
+
+def _render(renderable):
+    # Render to a throwaway console; asserts the view builds without raising.
+    Console(file=io.StringIO(), width=100).print(renderable)
+
+
+def test_render_opened_populated():
+    status = {
+        "a": {"live": True, "viewers": 100, "game": "Dota 2", "display": "A"},
+        "b": {"live": False, "viewers": 0, "game": "", "display": "B"},
+    }
+    _render(render_opened(["a", "b"], status, 0))
+
+
+def test_render_opened_empty():
+    _render(render_opened([], {}, 0))
+
+
+def test_render_opened_unknown_channel():
+    # Channel absent from status (category launch) must not raise.
+    _render(render_opened(["ghost"], {}, 0))
 
 
 def test_filter_streams():

@@ -347,6 +347,23 @@ def open_recording(channel):
         return False
 
 
+def close_channel(channel):
+    """Kill the tracked stream for a channel. Returns True if one was killed."""
+    # Take the entry out of the lock first: sync_state() below acquires _lock
+    # itself, so killing while holding it would deadlock.
+    with _lock:
+        entry = next((e for e in _open_streams if e["channel"] == channel), None)
+    if not entry:
+        return False
+    kill_tree(entry["slink_pid"], entry["slink_create"])
+    # Orphan case (streamlink already dead, player alive): kill the player too.
+    # kill_tree self-guards on create_time, so a stale pid is a no-op.
+    if entry.get("player_pid") is not None:
+        kill_tree(entry["player_pid"], entry["player_create"])
+    sync_state()  # reap the dead entry + rewrite/remove the state file
+    return True
+
+
 def install_exit_handlers():
     atexit.register(kill_streams)
 

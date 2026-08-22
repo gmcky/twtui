@@ -82,11 +82,60 @@ def render(channels, status, selected, checking, opened, failed):
     body = Panel(
         inner,
         title=_scroll_title("twitch — followed channels", start, end, len(channels)),
-        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint}{vod_hint} · tab search · s settings · q quit[/]",
+        subtitle=f"[dim]↑↓ move · enter watch · f unfollow · r refresh{rec_hint}{vod_hint} · w opened · tab search · s settings · q quit[/]",
         border_style=THEME["accent"],
         padding=(1, 2),
     )
     return body
+
+
+def render_opened(chans, status, selected):
+    # Quick-switch view over only the currently-open streams. Everything here is
+    # open, so no open-marker column; names go through Text() (never markup titles).
+    table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("", width=2, no_wrap=True)
+    table.add_column("Status", width=6, no_wrap=True)
+    table.add_column("Channel", ratio=2, no_wrap=True, overflow="ellipsis")
+    table.add_column("Viewers", justify="right", width=9, no_wrap=True)
+    table.add_column("Game", ratio=1, no_wrap=True, overflow="ellipsis")
+
+    vis, rsel, start, end = _window(chans, selected, _max_rows(6))
+    for j, ch in enumerate(vis):
+        is_sel = j == rsel
+        meta = status.get(ch) or OFFLINE
+        live = meta["live"]
+        dot, tag, tag_style = ("●", "LIVE", "bold green") if live else ("○", "off", "dim")
+        cursor = Text("❱", style=f"bold {THEME['cursor']}") if is_sel else Text(" ")
+        name_style = f"bold white on {THEME['highlight_bg']}" if is_sel else "white"
+        name = Text(f" {ch} ", style=name_style)
+        disp = meta.get("display", "")
+        if disp and disp.lower() != ch.lower():
+            name.append(f"({disp}) ", style="dim")
+        table.add_row(
+            cursor,
+            Text(dot, style=THEME["live"] if live else "dim"),
+            Text(tag, style=tag_style),
+            name,
+            Text(f"{meta['viewers']:,}" if live else "", style=THEME["live"] if live else "dim"),
+            Text(meta["game"] if live else "", style="cyan" if live else "dim"),
+        )
+
+    inner = (
+        table
+        if chans
+        else Align.center(
+            Text("no open streams — launch one from the list or search", style="dim"),
+            vertical="middle",
+        )
+    )
+    return Panel(
+        inner,
+        title=_scroll_title("open streams", start, end, len(chans)),
+        subtitle="[dim]↑↓ move · enter switch · x close · esc back · ctrl+q quit[/]",
+        border_style=THEME["accent"],
+        padding=(1, 2),
+    )
 
 
 def _filter_streams(streams, q):

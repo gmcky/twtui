@@ -69,6 +69,7 @@ SETTINGS = {
     "key_follow":   "f",
     "key_search":   "/",
     "key_settings": "s",
+    "key_opened":   "w",
     # System
     "run_on_startup": False,
 }
@@ -227,7 +228,7 @@ SETTINGS_SCHEMA = [
         {"key":"color_highlight_bg","type":"color","choices":BG_CHOICES,   "label":"Selected row",  "help":"highlighted row background"},
     ]),
     ("Lists", [
-        {"key":"list_autorefresh_secs","type":"int","min":0,"max":600,"step":5,"unit":"s","label":"Auto-refresh","help":"re-check followed status every N sec (0 = off)"},
+        {"key":"list_autorefresh_secs","type":"int","min":0,"max":600,"step":5,"unit":"s","label":"Auto-refresh","help":"re-check followed status every N sec (0 = off; keep >= 5 to avoid twitch throttling)"},
         {"key":"search_results",       "type":"int","min":5,"max":30, "step":5,"label":"Search results", "help":"max channel search rows (twitch caps ~10-15)"},
         {"key":"category_rows",        "type":"int","min":10,"max":100,"step":10,"label":"Category rows","help":"top games / category search rows"},
         {"key":"streams_per_category", "type":"int","min":10,"max":100,"step":10,"label":"Streams per category","help":"channels loaded when opening a category"},
@@ -238,6 +239,7 @@ SETTINGS_SCHEMA = [
         {"key":"key_follow",  "type":"key","label":"Follow",   "help":"follow/unfollow selected"},
         {"key":"key_search",  "type":"key","label":"Search",   "help":"open channel search"},
         {"key":"key_settings","type":"key","label":"Settings", "help":"open this screen"},
+        {"key":"key_opened",  "type":"key","label":"Opened",   "help":"open the currently-open streams view"},
     ]),
     ("System", [
         {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when your computer starts"},
@@ -454,6 +456,7 @@ def rebuild_keybinds():
     KEYBINDS["f"] = SETTINGS["key_follow"]
     KEYBINDS["/"] = SETTINGS["key_search"]
     KEYBINDS["s"] = SETTINGS["key_settings"]
+    KEYBINDS["w"] = SETTINGS["key_opened"]
 
 
 def load_config():
