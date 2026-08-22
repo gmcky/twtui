@@ -8,7 +8,7 @@ hotkey once and it is layout-agnostic everywhere.
 
 # List-mode single-key hotkeys (action -> bound key char). rebuild_keybinds()
 # in config overwrites the bound chars from user settings.
-KEYBINDS = {"q": "q", "r": "r", "f": "f", "/": "/", "s": "s"}
+KEYBINDS = {"q": "q", "r": "r", "f": "f", "/": "/", "s": "s", "w": "w"}
 
 # ЙЦУКЕН -> QWERTY by physical position. Only Cyrillic needs folding; a latin
 # layout already matches by character.

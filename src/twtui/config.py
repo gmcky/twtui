@@ -69,6 +69,7 @@ SETTINGS = {
     "key_follow":   "f",
     "key_search":   "/",
     "key_settings": "s",
+    "key_opened":   "w",
     # System
     "run_on_startup": False,
 }
@@ -238,6 +239,7 @@ SETTINGS_SCHEMA = [
         {"key":"key_follow",  "type":"key","label":"Follow",   "help":"follow/unfollow selected"},
         {"key":"key_search",  "type":"key","label":"Search",   "help":"open channel search"},
         {"key":"key_settings","type":"key","label":"Settings", "help":"open this screen"},
+        {"key":"key_opened",  "type":"key","label":"Opened",   "help":"open the currently-open streams view"},
     ]),
     ("System", [
         {"key":"run_on_startup","type":"bool","label":"Run on startup","help":"launch twtui when your computer starts"},
@@ -454,6 +456,7 @@ def rebuild_keybinds():
     KEYBINDS["f"] = SETTINGS["key_follow"]
     KEYBINDS["/"] = SETTINGS["key_search"]
     KEYBINDS["s"] = SETTINGS["key_settings"]
+    KEYBINDS["w"] = SETTINGS["key_opened"]
 
 
 def load_config():

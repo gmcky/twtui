@@ -36,6 +36,7 @@ from twtui.keys import read_key, term_restore, term_setup
 from twtui.streams import (
     LAUNCH_GRACE,
     cleanup_on_start,
+    close_channel,
     focus_channel,
     install_exit_handlers,
     launch,
@@ -53,6 +54,7 @@ from twtui.ui import (
     render_cats,
     render_channel,
     render_confirm,
+    render_opened,
     render_search,
     render_settings,
 )
@@ -64,6 +66,18 @@ def sort_channels(channels, status):
             not (status.get(c) or OFFLINE)["live"],
             -(status.get(c) or OFFLINE)["viewers"],
         )
+    )
+
+
+def sort_opened(opened, status):
+    # Stable order for the opened-streams view: live first, viewers desc, then name.
+    return sorted(
+        opened,
+        key=lambda c: (
+            not (status.get(c) or OFFLINE)["live"],
+            -(status.get(c) or OFFLINE)["viewers"],
+            c.lower(),
+        ),
     )
 
 
@@ -115,6 +129,7 @@ def main():
         "stop": False,
         "confirm_quit": False,
         "failed": {},
+        "opened_sel": 0,
     }
     lock = threading.Lock()
     typed = threading.Event()
@@ -155,6 +170,14 @@ def main():
             if st.get("confirm_quit"):
                 return
             live.update(render_channel(st), refresh=True)
+
+        def paint_opened():
+            if st.get("confirm_quit"):
+                return
+            chans = sort_opened(opened, status)
+            if st["opened_sel"] >= len(chans):
+                st["opened_sel"] = max(len(chans) - 1, 0)
+            live.update(render_opened(chans, status, st["opened_sel"]), refresh=True)
 
         def open_channel(login, display, back_mode):
             st["mode"] = "channel"
@@ -294,6 +317,8 @@ def main():
                             paint_search()
                         elif m == "cat":
                             paint_cat()
+                        elif m == "opened":
+                            paint_opened()
 
         sync_th = threading.Thread(target=sync_worker, daemon=True)
         sync_th.start()
@@ -394,6 +419,8 @@ def main():
                             paint_channel()
                         elif mode == "settings":
                             paint_settings()
+                        elif mode == "opened":
+                            paint_opened()
                     continue
 
                 mode = st["mode"]
@@ -567,6 +594,11 @@ def main():
                         if filtered:
                             st["ch_sel"] = (st["ch_sel"] + delta) % len(filtered)
                         paint_channel()
+                    elif mode == "opened":
+                        chans = sort_opened(opened, status)
+                        if chans:
+                            st["opened_sel"] = (st["opened_sel"] + delta) % len(chans)
+                        paint_opened()
                     continue
 
                 if tok in ("LEFT", "RIGHT"):  # switch streamers/categories
@@ -670,6 +702,28 @@ def main():
                         paint_channel()
                     continue
 
+                if mode == "opened":
+                    chans = sort_opened(opened, status)
+                    if st["opened_sel"] >= len(chans):
+                        st["opened_sel"] = max(len(chans) - 1, 0)
+                    if tok == "ENTER":
+                        if chans:
+                            do_launch(chans[st["opened_sel"]], paint_opened)
+                    elif tok == "ESC":
+                        st["mode"] = "list"
+                        paint_list()
+                    elif fold(char) == "x":  # close the selected stream
+                        if chans:
+                            ch = chans[st["opened_sel"]]
+                            if close_channel(ch):
+                                opened.discard(ch)
+                                if not opened:
+                                    st["mode"] = "list"
+                                    paint_list()
+                                else:
+                                    paint_opened()
+                    continue
+
                 if tok == "CTRL_V" and not FEATURES_LOCKED:
                     if mode == "list" and channels:
                         ch = channels[selected]
@@ -748,6 +802,10 @@ def main():
                         st["set_sel"] = 0
                         st["set_editing"] = False
                         paint_settings()
+                    elif hot == "w":  # opened-streams quick-switch view
+                        st["mode"] = "opened"
+                        st["opened_sel"] = 0
+                        paint_opened()
                     elif hot == "r":
                         live.auto_refresh = True
                         live.update(loading_panel(), refresh=True)
