@@ -30,8 +30,9 @@ live stream in mpv or VLC, all from the terminal: no browser, no login, no API
 key. streamlink does the resolving and launching; twtui is the fast,
 keyboard-driven front end around it.
 
-It began as a stream launcher and is growing into a full terminal Twitch client
-(VODs, clips, and an integrated chat overlay). See [Roadmap](#roadmap).
+For now it runs entirely in the terminal, keyboard-driven and powered by
+streamlink; the plan is to grow it into a full graphical launcher. See
+[Roadmap](#roadmap).
 
 ![Followed channels](docs/screenshots/followed.png)
 
