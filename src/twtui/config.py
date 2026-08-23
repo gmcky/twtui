@@ -11,15 +11,12 @@ from twtui.keymap import KEYBINDS
 
 STREAMLINK = "streamlink"
 
-# Non-live features (DVR restart, recording, VOD browsing) are locked until the
-# native launcher lands — they conflict with live low-latency playback and add
-# large start delays. Code stays intact; only the entry points are gated. Flip
-# to False to re-enable. Clip playback is NOT gated.
+# Non-live features gated until native launcher (they conflict with low-latency).
 FEATURES_LOCKED = True
 
 QUALITY_CHOICES = ["best", "1080p60", "720p60", "720p", "480p", "worst"]
 
-# hand-aligned table; keep the columns, don't let the formatter reflow it
+# hand-aligned table; keep columns
 # fmt: off
 SETTINGS = {
     # Quick setup
@@ -115,8 +112,7 @@ PRESET_CHOICES = [
     "Unstable connection",
 ]
 
-# Keys a preset fully specifies. A preset is "active" when every one of these
-# equals the preset's fingerprint; otherwise the preset is "Custom".
+# Keys defining a preset. If all match, it's active; else 'Custom'.
 BUNDLE_KEYS = [
     "quality",
     "low_latency",
@@ -131,7 +127,7 @@ BUNDLE_KEYS = [
     "ip_version",
 ]
 
-# hand-aligned preset table; keep columns intact
+# hand-aligned preset table; keep columns
 # fmt: off
 PRESETS = {
     "Low latency": {
@@ -185,7 +181,7 @@ def detect_preset():
     return "Custom"
 
 
-# hand-aligned schema table; the columns are intentional, keep them
+# hand-aligned schema table; keep columns
 # fmt: off
 SETTINGS_SCHEMA = [
     ("General", [
@@ -249,9 +245,7 @@ SETTINGS_SCHEMA = [
 ]
 # fmt: on
 
-# Hide sections that don't belong in the current live-only build: Recording
-# (record + DVR restart, non-live features) and System (run-on-startup, which
-# only makes sense once twtui is a standalone launcher, not a terminal app).
+# Hide non-live sections (Recording) and launcher-only sections (System).
 if FEATURES_LOCKED:
     _HIDDEN_SECTIONS = {"Recording", "System"}
     SETTINGS_SCHEMA = [sec for sec in SETTINGS_SCHEMA if sec[0] not in _HIDDEN_SECTIONS]
@@ -317,20 +311,17 @@ def build_stream_cmd(target):
 
     args = [STREAMLINK, url, s["quality"]]
 
-    # Latency: --twitch-low-latency only enables LL-part prefetch, it does NOT
-    # move the start point. Without forcing edge=1 streamlink starts ~3 segments
-    # behind live, adding 20-30s of delay. Old builds passed edge=1 here — keep it.
+    # --twitch-low-latency only prefetches; force edge=1 to start at live edge.
     if not is_static:
         if s["low_latency"]:
             args += ["--twitch-low-latency", "--hls-live-edge", "1"]
         else:
             args += ["--hls-live-edge", str(s["hls_live_edge"])]
 
-    # Codecs (only if not the plain default, to keep the cmd clean).
+    # Codecs (omit defaults).
     if s["twitch_codecs"] and s["twitch_codecs"] != "h264":
         args += ["--twitch-supported-codecs", s["twitch_codecs"]]
 
-    # Player.
     player = s["player_path"].strip()
     if player:
         args += ["--player", player]
@@ -338,22 +329,17 @@ def build_stream_cmd(target):
     if user_pargs:
         args += ["--player-args", user_pargs]
     elif not is_static and s["low_latency"] and _is_vlc(player):
-        # --twitch-low-latency feeds VLC at the live edge, but VLC stacks its own
-        # ~1-1.5s network/live cache on top, and once it buffers on any hiccup it
-        # never seeks forward — the lag only accumulates (seen: ~30s behind).
-        # Cut VLC's caches so playback tracks the edge. Injected only for VLC and
-        # only when the user hasn't supplied their own --player-args.
+        # Cut VLC's caches to prevent lag accumulation. Only if no custom --player-args.
         args += [
             "--player-args",
             "--network-caching=500 --live-caching=500 "
             "--sout-mux-caching=500 --clock-jitter=0 --clock-synchro=0",
         ]
 
-    # Reliability. Each 0/default value means "omit the flag".
+    # Reliability.
     if not is_static:
         if s["retry_streams"] > 0:
             args += ["--retry-streams", str(s["retry_streams"])]
-            # retry_max only meaningful while retrying; 0 -> unlimited (omit flag).
             if s["retry_max"] > 0:
                 args += ["--retry-max", str(s["retry_max"])]
         if s["retry_open"] != 1:
@@ -373,10 +359,8 @@ def build_stream_cmd(target):
     elif s["ip_version"] == "ipv6":
         args += ["--ipv6"]
 
-    # --hls-live-restart rewinds to the OLDEST segment in the DVR window, which
-    # directly contradicts low-latency (start at the live edge). With both on,
-    # restart wins and silently adds the whole window as lag (~20-200s). Honor
-    # it only when low latency is off.
+    # --hls-live-restart rewinds to window start; with LL on it silently adds
+    # the whole window as lag (~20-200s). Only when LL is off.
     if not FEATURES_LOCKED and not is_static and s["dvr_restart"] and not s["low_latency"]:
         args += ["--hls-live-restart"]
     if not FEATURES_LOCKED and s["record_streams"] and s["record_dir"].strip():
@@ -392,7 +376,7 @@ def build_stream_cmd(target):
         except Exception:
             pass
 
-    # Custom flags LAST so a power user can override anything above.
+    # Custom flags LAST to allow overrides.
     extra = s["custom_flags"].strip()
     if extra:
         try:
@@ -402,7 +386,7 @@ def build_stream_cmd(target):
     return args
 
 
-# App dir (frozen exe or source); used only to find a legacy channels.txt / *.bat.
+# App dir (frozen/source); used for legacy channels.txt.
 if getattr(sys, "frozen", False):
     APP_DIR = os.path.dirname(sys.executable)
 else:
@@ -412,7 +396,7 @@ BAT_DIR = getattr(sys, "_MEIPASS", APP_DIR)
 
 
 def _config_dir():
-    # Per-user writable config dir (source / frozen exe / pipx install).
+    # Per-user config dir. TWITCH_TUI_CHANNELS overrides this.
     if sys.platform == "win32":
         base = os.environ.get("APPDATA") or os.path.expanduser("~")
     elif sys.platform == "darwin":
@@ -600,8 +584,7 @@ def _macos_startup(enabled, home):
 
 
 def save_config():
-    # preset is kept in sync on edit (see sync_preset_from_settings), so persist
-    # the stored tag as-is — don't recompute here.
+    # preset synced on edit; persist as-is.
     try:
         with open(CONFIG_FILE, "w", encoding="utf-8") as f:
             json.dump(SETTINGS, f, indent=2)
@@ -622,7 +605,7 @@ def load_channels():
     if os.path.exists(CHANNELS_FILE):
         return _read_channels(CHANNELS_FILE)
 
-    # First run: seed from a legacy channels.txt next to the app, else *.bat, else empty.
+    # First run: seed from legacy files or empty.
     legacy = os.path.join(APP_DIR, "channels.txt")
     if os.path.exists(legacy):
         channels = _read_channels(legacy)

@@ -50,7 +50,7 @@ else:
         fd = sys.stdin.fileno()
         b = os.read(fd, 1)
         if b == b"\x1b":
-            # ESC alone vs an escape sequence: brief peek for the continuation.
+            # ESC vs escape sequence peek.
             r, _, _ = select.select([fd], [], [], 0.03)
             if not r:
                 return "ESC"
@@ -59,7 +59,7 @@ else:
         o = b[0]
         if o < 0x80:
             return _norm(chr(o))
-        # utf-8 lead byte: read the continuation bytes and decode.
+        # Decode utf-8 sequence.
         n = 2 if o < 0xE0 else 3 if o < 0xF0 else 4
         try:
             return _norm((b + os.read(fd, n - 1)).decode("utf-8"))

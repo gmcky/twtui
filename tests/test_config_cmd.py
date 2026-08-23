@@ -6,13 +6,12 @@ def test_live_defaults(settings):
     cmd = build_stream_cmd("foo")
     assert cmd[:3] == ["streamlink", "twitch.tv/foo", "best"]
     assert "--twitch-low-latency" in cmd
-    # low latency must force edge=1, else streamlink starts ~3 segments behind
+    # low latency must force edge=1.
     assert cmd[cmd.index("--hls-live-edge") + 1] == "1"
 
 
 def test_dvr_restart_suppressed_by_low_latency(settings):
-    # --hls-live-restart rewinds to the window start; combined with low latency
-    # it silently adds the whole DVR window as lag. Must be dropped when LL is on.
+    # --hls-live-restart contradicts LL. Must be dropped.
     settings["low_latency"] = True
     settings["dvr_restart"] = True
     cmd = build_stream_cmd("foo")
@@ -24,7 +23,7 @@ def test_dvr_restart_without_low_latency(settings):
     settings["dvr_restart"] = True
     cmd = build_stream_cmd("foo")
     if FEATURES_LOCKED:
-        # DVR restart is gated off entirely while non-live features are locked.
+        # DVR restart is gated off.
         assert "--hls-live-restart" not in cmd
     else:
         assert "--hls-live-restart" in cmd
@@ -148,7 +147,7 @@ def test_record_clip(settings, tmp_path):
     settings["record_dir"] = str(tmp_path)
     cmd = build_stream_cmd("https://clips.twitch.tv/Foo")
     if FEATURES_LOCKED:
-        # Recording is gated off while non-live features are locked.
+        # Recording is gated off.
         assert "--record" not in cmd
         return
     assert "--record" in cmd

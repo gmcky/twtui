@@ -95,7 +95,7 @@ def _gql(query, variables):
 
 
 def _gql_live(logins):
-    # One request resolves live-status for a batch of logins -> {login_lower: meta}.
+    # Resolve live-status -> {login: meta}.
     try:
         users = _gql(USERS_QUERY, {"logins": logins})["data"]["users"]
     except Exception:
@@ -115,7 +115,7 @@ def _gql_live(logins):
 
 
 def get_status(channels):
-    # Chunk under the per-query login cap; run chunks in parallel.
+    # Chunk and fetch in parallel.
     chunks = [channels[i : i + 90] for i in range(0, len(channels), 90)]
     meta = {}
     with ThreadPoolExecutor(max_workers=max(len(chunks), 1)) as pool:
@@ -125,8 +125,7 @@ def get_status(channels):
 
 
 def twitch_search(query, limit=15):
-    # Fuzzy channel search across all of Twitch, live channels first (stable sort
-    # keeps Twitch's relevance order within each group).
+    # Fuzzy search, live first.
     try:
         edges = _gql(SEARCH_QUERY, {"q": query})["data"]["searchFor"]["channels"]["edges"]
     except Exception:
@@ -152,7 +151,7 @@ def twitch_search(query, limit=15):
 
 
 def top_games(limit=100):
-    # Most-watched categories right now (shown when the category box is empty).
+    # Most-watched categories.
     try:
         edges = _gql(TOP_GAMES_QUERY, {"n": limit})["data"]["games"]["edges"]
     except Exception:
@@ -174,7 +173,7 @@ def top_games(limit=100):
 
 
 def search_games(query, limit=15):
-    # Fuzzy category search (same relevance behaviour as channel search).
+    # Fuzzy category search.
     try:
         edges = _gql(GAMES_SEARCH_QUERY, {"q": query})["data"]["searchFor"]["games"]["edges"]
     except Exception:
@@ -196,7 +195,7 @@ def search_games(query, limit=15):
 
 
 def game_streams(name, limit=100):
-    # Top live channels in a category, ordered by viewers (Twitch default).
+    # Top live channels by viewers.
     try:
         edges = _gql(GAME_STREAMS_QUERY, {"name": name, "n": limit})["data"]["game"]["streams"][
             "edges"
@@ -223,7 +222,7 @@ def game_streams(name, limit=100):
 
 
 def channel_videos(login, limit=20):
-    # Recent past broadcasts (VODs) for a channel, newest first.
+    # Recent VODs.
     try:
         edges = _gql(CHANNEL_VIDEOS_QUERY, {"login": login, "n": limit})["data"]["user"]["videos"][
             "edges"

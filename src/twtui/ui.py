@@ -146,12 +146,12 @@ def _filter_streams(streams, q):
 
 
 def _max_rows(reserve):
-    # Rows that fit in the current terminal after fixed chrome (borders/header).
+    # Terminal capacity minus chrome.
     return max(3, console.size.height - reserve)
 
 
 def _window(items, sel, max_rows):
-    # Scroll window around the selection -> (items, rel_sel, start, end).
+    # Window around selection.
     n = len(items)
     if n <= max_rows or max_rows <= 0:
         return items, sel, 0, n
@@ -160,14 +160,14 @@ def _window(items, sel, max_rows):
 
 
 def _scroll_title(base, start, end, n):
-    # Panel title with a scroll indicator when the list overflows the window.
+    # Title with scroll indicator.
     if n > end - start:
         return f"[bold {THEME['accent']}]{base}[/] [dim]{start + 1}-{end}/{n}[/]"
     return f"[bold {THEME['accent']}]{base}[/]"
 
 
 def _tabs(active):
-    # Streamers / Categories switcher header; active tab highlighted, both legible.
+    # Tab switcher.
     def seg(label, key):
         return (
             f"[black on {THEME['tab']}] {label} [/]"
@@ -183,7 +183,7 @@ def _tabs(active):
 def _channel_table(results, sel, opened, followed, failed=None):
     if failed is None:
         failed = {}
-    # Shared by the search view and the in-category view.
+    # Shared by search and categories.
     table = Table(show_header=True, box=None, padding=(0, 1), header_style="bold dim", expand=True)
     table.add_column("", width=2, no_wrap=True)
     table.add_column("", width=2, no_wrap=True)

@@ -6,12 +6,10 @@ work under a Cyrillic layout without every call site re-implementing it. Add a
 hotkey once and it is layout-agnostic everywhere.
 """
 
-# List-mode single-key hotkeys (action -> bound key char). rebuild_keybinds()
-# in config overwrites the bound chars from user settings.
+# action -> key. Config overrides these.
 KEYBINDS = {"q": "q", "r": "r", "f": "f", "/": "/", "s": "s", "w": "w"}
 
-# ЙЦУКЕН -> QWERTY by physical position. Only Cyrillic needs folding; a latin
-# layout already matches by character.
+# ЙЦУКЕН -> QWERTY physical folding.
 FOLD = {
     "й": "q",
     "ц": "w",
@@ -46,11 +44,11 @@ FOLD = {
     "б": ",",
     "ю": ".",
     "ё": "`",
-    # Physical /? key: Cyrillic layout emits '.', so fold it back for search.
+    # Cyrillic '/' physical key emits '.'.
     ".": "/",
 }
 
-# Normalised special-key tokens returned by read_key().
+# Special tokens.
 SPECIAL = {
     "UP",
     "DOWN",
@@ -65,7 +63,7 @@ SPECIAL = {
     "CTRL_Q",
 }
 
-# Raw control characters -> tokens.
+# Control chars.
 CTRL = {
     "\r": "ENTER",
     "\n": "ENTER",
@@ -78,10 +76,10 @@ CTRL = {
     "\x11": "CTRL_Q",
 }
 
-# Windows getwch arrow codes -> tokens.
+# Windows arrows.
 WIN_ARROW = {"H": "UP", "P": "DOWN", "K": "LEFT", "M": "RIGHT"}
 
-# POSIX escape-sequence tails -> tokens.
+# POSIX escapes.
 POSIX_SEQ = {
     "[A": "UP",
     "[B": "DOWN",

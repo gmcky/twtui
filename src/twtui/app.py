@@ -85,15 +85,14 @@ def main():
     load_config()
     install_exit_handlers()
     still_open = cleanup_on_start()
-    channels = load_channels()  # may be empty on a fresh install — that's fine,
-    # follow channels from the search view (tab / →)
+    channels = load_channels()
 
     status = {ch: False for ch in channels}
     opened = set(still_open)  # streams from a previous session, still running
     followed = {c.lower() for c in channels}  # lowercased logins, kept in sync
     selected = 0
 
-    # Shared state for the search modes + worker thread.
+    # search worker state
     st = {
         "mode": "list",  # "list" | "search" | "cats" | "cat" | "settings"
         "query": "",  # channel search
@@ -113,7 +112,7 @@ def main():
         "cat_results": [],
         "cat_sel": 0,
         "cat_searching": False,
-        # inside a category ("cat"): streams loaded once, filtered client-side
+        # inside category: filter locally
         "game_name": "",
         "game_display": "",
         "cat_streams": [],
@@ -137,8 +136,7 @@ def main():
     with Live(
         loading_panel(), console=console, screen=True, auto_refresh=True, refresh_per_second=12
     ) as live:
-        # The quit-confirm modal must stay on top: background workers keep
-        # painting the underlying view, so every painter yields to it here.
+        # Yield repaints to quit-confirm modal.
         def paint_list():
             if st.get("confirm_quit"):
                 return
@@ -217,8 +215,7 @@ def main():
                     paint_cat()
 
         def do_launch(ch, repaint):
-            # Already open: focus its window instead of spawning a duplicate.
-            # Focus failing (window gone, or non-Windows) falls through to relaunch.
+            # Focus existing window; relaunch on fail.
             if ch in opened and focus_channel(ch):
                 return
             entry = launch(ch)
@@ -236,8 +233,7 @@ def main():
                 typed.set()
 
         def search_worker():
-            # Debounce keystrokes, query Twitch off-thread, repaint. Serves the two
-            # network-backed views: channel search and categories.
+            # Debounce and query off-thread.
             while not st["stop"]:
                 typed.wait(timeout=0.5)
                 if st["stop"]:
@@ -303,8 +299,7 @@ def main():
                     now = time.time()
                     alive = live_channels()
                     with lock:
-                        # Drop the "open" tag for streams whose process died
-                        # (e.g. player closed by hand), not just grace failures.
+                        # Clear dead stream tags.
                         stale = opened - alive
                         opened.difference_update(stale)
                         for c in [c for c, ts in st["failed"].items() if now - ts > 6]:
@@ -360,7 +355,7 @@ def main():
         paint_list()
 
         def open_categories():
-            # Enter category search; kick the worker to load top games.
+            # Enter category mode.
             st["mode"] = "cats"
             with lock:
                 st["cat_query"], st["cat_results"], st["cat_sel"] = "", [], 0
@@ -370,7 +365,7 @@ def main():
             paint_cats()
 
         def follow_toggle(res):
-            # Follow/unfollow, then re-sort so a new live channel joins the live group.
+            # Toggle follow, re-sort.
             nonlocal selected
             login = res["login"]
             if login.lower() in followed:
@@ -770,7 +765,7 @@ def main():
                         typed.set()
                         paint_search()
                     elif char is not None:
-                        # Any language: Twitch search matches display names too.
+                        # Matches display names.
                         with lock:
                             st["query"] += char
                             st["gen"] += 1

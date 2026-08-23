@@ -44,7 +44,7 @@ def stream_alive(entry):
 
 
 def _record_path_of(cmd):
-    # Pull the --record target back out of the built command, if any.
+    # Extract the --record target if any.
     try:
         return cmd[cmd.index("--record") + 1]
     except (ValueError, IndexError):
@@ -113,11 +113,7 @@ def sync_state():
                 except psutil.Error:
                     pass
 
-            # Player was spawned and has since gone (stream ended, or the window
-            # was closed) while streamlink lingers: reap streamlink so a hidden
-            # console (CREATE_NO_WINDOW) doesn't stay running headless with no way
-            # to close it. Only when a player was actually recorded — a bare
-            # streamlink with no child yet may be retry_streams waiting for live.
+            # Reap streamlink if player died to prevent hidden zombies.
             if slink_alive and entry["player_pid"] is not None and not player_alive:
                 kill_tree(entry["slink_pid"], entry["slink_create"])
                 slink_alive = False
@@ -139,8 +135,7 @@ def sync_state():
 
 
 def live_channels():
-    # Channels backed by a still-running process. Reflects reality after the
-    # last sync_state(), so a manually-closed player drops out on its own.
+    # Active processes. Sync drops manually closed players.
     with _lock:
         return {entry["channel"] for entry in _open_streams}
 
@@ -178,8 +173,7 @@ def _focus_windows(pids, activate=True):
         pid = wintypes.DWORD()
         user32.GetWindowThreadProcessId(hwnd, ctypes.byref(pid))
         if pid.value in pids:
-            # Only un-minimize a minimized window; restoring a fullscreen player
-            # would drop it out of fullscreen.
+            # Only restore minimized windows (avoid dropping fullscreen).
             if activate:
                 if user32.IsIconic(hwnd):
                     user32.ShowWindow(hwnd, SW_RESTORE)
@@ -217,8 +211,7 @@ def focus_channel(channel):
         if entry.get("player_pid") is not None:
             pids.add(entry["player_pid"])
         slink_pid = entry.get("slink_pid")
-    # player_pid may not be recorded yet (sync runs on a timer); pull the live
-    # child of streamlink directly so a just-launched stream can still focus.
+    # Pull live child directly (sync timer may not have recorded it yet).
     if slink_pid is not None:
         try:
             for child in psutil.Process(slink_pid).children(recursive=True):
@@ -330,8 +323,7 @@ def cleanup_on_start():
             if player_pid is not None:
                 kill_tree(player_pid, player_create)
             continue
-        # Still running from a previous session: keep tracking it so the list
-        # shows it as open on startup and sync_state() reaps it when it dies.
+        # Track previous session orphans for reap/UI.
         if slink_alive or player_alive:
             survivors.append(entry)
 
