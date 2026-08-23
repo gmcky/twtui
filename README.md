@@ -96,7 +96,7 @@ Settings persist to `config.json` in the same config dir.
 
 ## Roadmap
 
-Working toward a full terminal Twitch client on top of the current launcher.
+Working toward a full Twitch client, with a launcher built on top of the terminal Twitch UI.
 
 - **VODs and clips**: browse a channel's past broadcasts and open VODs on a seekable
   timeline. The groundwork exists in the codebase but is gated off in this build.
