@@ -233,7 +233,6 @@ def main():
                 typed.set()
 
         def search_worker():
-            # Debounce and query off-thread.
             while not st["stop"]:
                 typed.wait(timeout=0.5)
                 if st["stop"]:
@@ -299,7 +298,6 @@ def main():
                     now = time.time()
                     alive = live_channels()
                     with lock:
-                        # Clear dead stream tags.
                         stale = opened - alive
                         opened.difference_update(stale)
                         for c in [c for c, ts in st["failed"].items() if now - ts > 6]:
@@ -355,7 +353,6 @@ def main():
         paint_list()
 
         def open_categories():
-            # Enter category mode.
             st["mode"] = "cats"
             with lock:
                 st["cat_query"], st["cat_results"], st["cat_sel"] = "", [], 0
@@ -365,7 +362,6 @@ def main():
             paint_cats()
 
         def follow_toggle(res):
-            # Toggle follow, re-sort.
             nonlocal selected
             login = res["login"]
             if login.lower() in followed:
@@ -765,7 +761,6 @@ def main():
                         typed.set()
                         paint_search()
                     elif char is not None:
-                        # Matches display names.
                         with lock:
                             st["query"] += char
                             st["gen"] += 1

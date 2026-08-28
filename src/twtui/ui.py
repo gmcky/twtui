@@ -146,12 +146,10 @@ def _filter_streams(streams, q):
 
 
 def _max_rows(reserve):
-    # Terminal capacity minus chrome.
     return max(3, console.size.height - reserve)
 
 
 def _window(items, sel, max_rows):
-    # Window around selection.
     n = len(items)
     if n <= max_rows or max_rows <= 0:
         return items, sel, 0, n
@@ -160,14 +158,12 @@ def _window(items, sel, max_rows):
 
 
 def _scroll_title(base, start, end, n):
-    # Title with scroll indicator.
     if n > end - start:
         return f"[bold {THEME['accent']}]{base}[/] [dim]{start + 1}-{end}/{n}[/]"
     return f"[bold {THEME['accent']}]{base}[/]"
 
 
 def _tabs(active):
-    # Tab switcher.
     def seg(label, key):
         return (
             f"[black on {THEME['tab']}] {label} [/]"
@@ -208,7 +204,6 @@ def _channel_table(results, sel, opened, followed, failed=None):
             watching.append("✗ failed", style="bold red")
         elif res["login"] in opened:
             watching.append("▶ open", style=f"bold {THEME['open']}")
-        # login + dim display name when they differ.
         name = Text(f" {res['login']} ", style=name_style)
         if res["display"] and res["display"].lower() != res["login"].lower():
             name.append(f"({res['display']}) ", style="dim")
