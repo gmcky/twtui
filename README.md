@@ -114,6 +114,10 @@ Working toward a full Twitch client, with a launcher built on top of the termina
   break when Twitch changes things. Search returns ~10 results and lists load a
   single page (row counts are configurable, but Twitch caps search server-side);
   deeper paging needs a signed token and is not implemented.
+- Playback goes through [streamlink](https://streamlink.github.io/) into an external
+  player, so streams play without Twitch ads. Both the unofficial endpoints and
+  ad-free playback sit outside Twitch's terms; use it for personal viewing at your
+  own risk.
 - Not affiliated with Twitch.
 
 ## License
