@@ -5,7 +5,7 @@
 <h1 align="center">twtui</h1>
 
 <p align="center">
-  <strong>Watch Twitch from your terminal.</strong>
+  <strong>Browse and launch Twitch streams from your terminal.</strong>
 </p>
 
 <p align="center">
