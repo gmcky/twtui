@@ -26,6 +26,6 @@ cmd = [
     os.path.join(ROOT, "build_tmp"),
     "--specpath",
     os.path.join(ROOT, "build_tmp"),
-    os.path.join(ROOT, "watch.py"),
+    os.path.join(ROOT, "src", "twtui", "__main__.py"),
 ]
 raise SystemExit(subprocess.call(cmd))
