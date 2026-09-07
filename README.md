@@ -123,3 +123,10 @@ Working toward a full Twitch client, with a launcher built on top of the termina
 ## License
 
 MIT
+
+## Support
+
+<p align="center">
+  <a href="https://ko-fi.com/gmcky"><img src="https://img.shields.io/badge/Ko--fi-support-FF5E5B?style=flat&logo=ko-fi&logoColor=white" alt="Ko-fi"></a>
+  <a href="https://www.patreon.com/cw/gmcky"><img src="https://img.shields.io/badge/Patreon-support-F96854?style=flat&logo=patreon&logoColor=white" alt="Patreon"></a>
+</p>
